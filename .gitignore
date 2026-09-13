@@ -20,3 +20,8 @@ cangjie5*
 *.log
 *.tmp
 *.swp
+
+# 外觀編輯器的執行期資料
+tools/rime-appearance/snapshots/
+tools/rime-appearance/.fonts.json
+__pycache__/

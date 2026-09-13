@@ -340,7 +340,13 @@ Ctrl+\ 1 2 3
 
 ### 外觀
 
-在 [`squirrel.custom.yaml`](../squirrel.custom.yaml)，已分為配色／版面／候選格式／字型／幾何／視覺效果六組。幾個常動的：
+可以用附的本機 GUI 調整，有即時預覽、字型預覽與快照還原：
+
+```bash
+python3 ~/Library/Rime/tools/rime-appearance/server.py
+```
+
+也可以直接編輯 [`squirrel.custom.yaml`](../squirrel.custom.yaml)，已分為配色／版面／候選格式／字型／幾何／視覺效果六組。幾個常動的：
 
 | 設定 | 說明 |
 |---|---|

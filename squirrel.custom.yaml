@@ -4,7 +4,7 @@
 patch:
 
 # ── 配色 ──────────────────────────────────────────────────────────
-  style/color_scheme: luna                     # 亮色主題（luna 為 Squirrel 內建配色）
+  style/color_scheme: luna                     # 亮色主題
   style/color_scheme_dark: mac_dark            # 暗色主題；想跟亮色一致就改成 luna
 
 # ── 版面 ──────────────────────────────────────────────────────────
