@@ -217,7 +217,7 @@ end
 
 function simplified_commit(key, env)
   local representation = key:repr()
-  if representation ~= "Shift+Right" and representation ~= "Control+Shift+Right" then
+  if representation ~= "Shift+Right" and representation ~= "Super+Right" then
     return 2
   end
 
