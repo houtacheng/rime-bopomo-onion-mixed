@@ -38,6 +38,7 @@ engine:
 #     - charset_filter@big5
 #     - charset_filter@gbk
     - simplifier@zh_cn
+    - lua_filter@date_symbol_extras
     - lua_filter@simplified_hint
     - uniquifier
   processors:
@@ -58,6 +59,7 @@ engine:
     - punct_segmentor
     - fallback_segmentor
   translators:
+    - lua_translator@number_formats
     - punct_translator
     # - table_translator@custom_phrase
     - table_translator@english
@@ -212,6 +214,7 @@ punctuator:
 key_binder:
   import_preset: default
   bindings:
+    - {accept: Control+backslash, send: numbersign, when: always} #數字格式輸入
 ### 避 RIME 原設定鍵位衝突 ###
     - {accept: comma, send: comma, when: has_menu}
     - {accept: comma, send: comma, when: paging}
@@ -327,6 +330,7 @@ editor:
 ########################## 用正則調出各種功能 ##############################
 recognizer:
   patterns:
+    number_input: "^#[0-9]*$"
     # uppercase: "^[A-Z][-_+.'0-9A-Za-z]*$"
     url: "^(https?:|ftp:|mailto:|file:).*$"
     email: "^[a-z][-_.0-9a-z]*@.*$"
