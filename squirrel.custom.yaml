@@ -2,36 +2,48 @@
 # 用法：想要哪項生效，就刪去該行行首的「#」字符，但注意保留用於縮進的空格
 
 patch:
-  style/color_scheme: mac_lamb                             # 主題樣式 #apathy #psionics #mac_white #mac_white2
-  style/color_scheme_dark: mac_dark                        # 同上，暗主題下
 
-  style/horizontal: false                              # 候選橫排 （新版已經無效，改以 candidate_list_layout 設定）
-  style/candidate_list_layout: stacked                 # 候選框樣式 （linear者爲線型，各候選首尾相連成一串，stacked者各候選皆另起一行，呈堆疊狀。）（默認stacked）
-  style/text_orientation: horizontal                   # 候選框文字方向 （horizontal者橫排自左至右，vertical者豎排自右至左。）（默認horizontal）
-  style/inline_preedit: false                          # 內嵌輸入碼
-  style/inline_candidate: false                        # 選中詞顯示位置
+# ── 配色 ──────────────────────────────────────────────────────────
+  style/color_scheme: luna                     # 亮色主題（luna 為 Squirrel 內建配色）
+  style/color_scheme_dark: mac_dark            # 暗色主題；想跟亮色一致就改成 luna
 
-  style/font_face: "TimesNewRomanPSMT, PingFangTC-Light, AppleColorEmoji" #,HanaMinA, HanaMinB
-  style/font_point: 22                                 # 備選字和輸入碼字體大小
-  style/comment_font_face: "PingFangTC-Light"          # 提示碼字體
-  style/comment_font_point: 17                         # 提示碼字體大小
-  style/label_font_face: "Andale Mono"                 # 前標號字體
-  style/label_font_point: 14                           # 前標號字體大小
+# ── 版面 ──────────────────────────────────────────────────────────
+  style/candidate_list_layout: stacked         # stacked 每個候選另起一行；linear 首尾相連成一串
+  style/text_orientation: horizontal           # horizontal 橫排；vertical 豎排
+  style/inline_preedit: false                  # false 為雙行顯示：候選窗頂端保留正在打的注音預覽
+  style/inline_candidate: false                # 選中候選是否就地顯示在游標處
+                                               # 註：設為 false 會讓「Up 鍵就地換字」失去就地預覽效果
+  style/status_message_type: mix               # 切換方案時的提示樣式：long | short | mix
+  style/mutual_exclusive: false                # 候選窗與狀態提示是否互斥顯示
+  style/memorize_size: true                    # linear 版面下記住候選窗長度，避免首選位置跳動
+  style/show_paging: false                     # 候選窗是否顯示翻頁指示（Squirrel 1.x 起支援）
 
-  style/candidate_format: "%c. %@"                     # 選字欄格式 （%c爲序號，%@爲詞）
-  # style/base_offset: 2                                 # 文字垂直方向位置調整 （正數向上（右），負數向下（左））
+# ── 候選格式 ──────────────────────────────────────────────────────
+  style/candidate_format: '[label]. [candidate] [comment]'
+                                               # Squirrel 1.x 的原生語法，也是其預設值
+                                               # 舊寫法 %c / %@ 仍可用，會被自動轉換成 [label] 與 [candidate] [comment]
 
-  style/corner_radius: 4                               # 整個窗口圓角
-  # style/border_height: 0                               # 窗口邊界高度 （大於圓角半徑才有效果）
-  # style/border_width: 0                                # 窗口邊界寬度 （大於圓角半徑才有效果）
-  style/hilited_corner_radius: 5                       # 候選條圓角
-  # style/surrounding_extra_expansion: 5                 # 非高亮候選項背景框大小縮放
-  style/line_spacing: 1                                # 候選字間隙大小
-  style/spacing: 3                                     # 鍵入碼區與候選項區間距
-  # memorize_size: false                                 # 選定線型候選框樣式時，當候選框末端接觸屏幕邊時，是否記住候選框長度，以選免首選項位置快速變
+# ── 字型 ──────────────────────────────────────────────────────────
+  style/font_face: "LiGothicMed"               # 候選字與輸入碼
+  style/font_point: 20
+  style/comment_font_face: "PingFangTC-Light"  # 提示碼
+  style/comment_font_point: 17
+  style/label_font_face: "Andale Mono"         # 前標號
+  style/label_font_point: 14
+  # style/base_offset: 2                       # 文字垂直位置微調（正數向上／右）
 
-  style/alpha: 0.9                                   # 候選框整體透明度 （0-1範圍）（默認1）
-  style/translucency: true                           # 毛玻璃背景 （當背景色呈半透明時可見）（默認false）
+# ── 幾何 ──────────────────────────────────────────────────────────
+  style/corner_radius: 7                       # 窗口圓角
+  style/hilited_corner_radius: 0               # 候選條圓角
+  style/border_height: -2                      # 窗口邊界高度（需大於圓角半徑才看得出效果）
+  style/border_width: -2                       # 窗口邊界寬度
+  style/line_spacing: 5                        # 候選列之間的間隙
+  style/spacing: 8                             # 輸入碼區與候選區的間距
+  # style/surrounding_extra_expansion: 5       # 非高亮候選項背景框縮放
+
+# ── 視覺效果 ──────────────────────────────────────────────────────
+  style/alpha: 1                               # 整體不透明度（0–1）
+  style/translucency: false                    # 毛玻璃背景（背景色半透明時才看得到）
 
 ###################################################
   preset_color_schemes/lost_temple_border:
