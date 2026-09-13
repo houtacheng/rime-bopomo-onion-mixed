@@ -1,5 +1,27 @@
--- 顯示繁體候選的簡體提示，並以 Shift+Right 直接上屏簡體。
+-- 顯示繁體候選的簡體提示，並提供純注音／簡體快捷上屏。
 local tw_to_s = Opencc("tw2s.json")
+
+local bopomofo_keys = {
+  ["1"]="ㄅ", q="ㄆ", a="ㄇ", z="ㄈ", ["2"]="ㄉ", w="ㄊ", s="ㄋ", x="ㄌ",
+  e="ㄍ", d="ㄎ", c="ㄏ", r="ㄐ", f="ㄑ", v="ㄒ", ["5"]="ㄓ", t="ㄔ",
+  g="ㄕ", b="ㄖ", y="ㄗ", h="ㄘ", n="ㄙ", u="ㄧ", j="ㄨ", m="ㄩ",
+  ["8"]="ㄚ", i="ㄛ", k="ㄜ", [","]="ㄝ", ["9"]="ㄞ", o="ㄟ", l="ㄠ",
+  ["."]="ㄡ", ["0"]="ㄢ", p="ㄣ", [";"]="ㄤ", ["/"]="ㄥ", ["-"]="ㄦ",
+  [" "]="ˉ", ["6"]="ˊ", ["3"]="ˇ", ["4"]="ˋ", ["7"]="˙"
+}
+
+local function raw_to_bopomofo(raw)
+  local result = ""
+  for i = 1, #raw do
+    local key = raw:sub(i, i)
+    if key ~= "\\" then
+      local symbol = bopomofo_keys[key]
+      if not symbol then return nil end
+      result = result .. symbol
+    end
+  end
+  return result ~= "" and result or nil
+end
 
 local weekday = { "日", "一", "二", "三", "四", "五", "六" }
 local stems = { "甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸" }
@@ -37,6 +59,8 @@ end
 local function date_formats(timestamp)
   local d = os.date("*t", timestamp)
   local result = {
+    string.format("%04d.%02d.%02d", d.year, d.month, d.day),
+    string.format("%04d.%02d.%02d(%s)", d.year, d.month, d.day, weekday[d.wday]),
     string.format("%d 年 %d 月 %d 日", d.year, d.month, d.day),
     string.format("%04d-%02d-%02d", d.year, d.month, d.day),
     string.format("民國 %d 年 %d 月 %d 日", d.year - 1911, d.month, d.day),
@@ -182,7 +206,8 @@ function simplified_hint(input, env)
 end
 
 function simplified_commit(key, env)
-  if key:repr() ~= "Shift+Right" then
+  local representation = key:repr()
+  if representation ~= "Shift+Right" and representation ~= "Control+Shift+Right" then
     return 2
   end
 
@@ -191,12 +216,15 @@ function simplified_commit(key, env)
     return 2
   end
 
-  local candidate = context:get_selected_candidate()
-  if not candidate then
-    return 2
+  if representation == "Shift+Right" then
+    local bopomofo = raw_to_bopomofo(context.input)
+    if not bopomofo then return 2 end
+    env.engine:commit_text(bopomofo)
+  else
+    local candidate = context:get_selected_candidate()
+    if not candidate then return 2 end
+    env.engine:commit_text(tw_to_s:convert(candidate.text))
   end
-
-  env.engine:commit_text(tw_to_s:convert(candidate.text))
   context:clear()
   return 1
 end
