@@ -33,12 +33,9 @@ patch:
     # move by word
     - { when: composing, accept: ISO_Left_Tab, send: Shift+Left }
     - { when: composing, accept: Shift+Tab, send: Shift+Left }
-    - { when: composing, accept: Tab, send: Shift+Right }
-    # flip page
-    - { when: has_menu, accept: minus, send: Page_Up }
-    - { when: has_menu, accept: equal, send: Page_Down }
-    - { when: paging, accept: comma, send: Page_Up }
-    - { when: has_menu, accept: period, send: Page_Down }
+    # 注意：不要在此加入 minus/equal/comma/period/Tab 的翻頁綁定。
+    # 這些鍵在注音方案中是 ㄦ／ㄝ／ㄡ 與「接受首選英文」，
+    # 且 import_preset 的條目排序永遠在方案自訂條目之前，會把方案設定整個蓋掉。
     # hotkey switch
     - { when: always, accept: Control+Shift+1, select: .next }
     - { when: always, accept: Control+Shift+2, toggle: ascii_mode }
