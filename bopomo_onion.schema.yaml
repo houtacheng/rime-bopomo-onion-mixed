@@ -227,7 +227,7 @@ key_binder:
     - {accept: equal, send: equal, when: has_menu}
     - {accept: equal, send: equal, when: paging}
 ### 切分移位 ###
-    - {accept: Up, send: Down, when: has_menu} #就地換下一個候選；需搭配 squirrel.custom.yaml 的 style/inline_candidate: true
+    - {accept: Up, send: Up, when: has_menu} #上一個候選（讓給 selector 處理；配合 Down 形成雙向選字）
     - {accept: Up, send: KP_Left, when: composing} #無候選選單時才左移一個注音
     - {accept: Left, send: Page_Up, when: has_menu} #候選選單優先向前翻頁
     - {accept: Right, send: Page_Down, when: has_menu} #候選選單優先向後翻頁
