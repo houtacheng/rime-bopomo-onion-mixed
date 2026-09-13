@@ -268,9 +268,14 @@ function buildFontPickers(){
          <span class="ps">${f}</span></div>`).join('') ||
         '<div style="color:var(--muted)">沒有符合的字型</div>';
     };
-    input.addEventListener('focus', () => { fill(input.value); list.classList.add('open'); });
+    // 聚焦時全選，這樣直接打字就是重新搜尋，不會接在原值後面
+    input.addEventListener('focus', () => { input.select(); fill(''); list.classList.add('open'); });
     input.addEventListener('input', () => { fill(input.value); list.classList.add('open'); });
-    input.addEventListener('blur', () => setTimeout(() => list.classList.remove('open'), 180));
+    input.addEventListener('blur', () => setTimeout(() => {
+      list.classList.remove('open');
+      // 沒選中任何字型就還原成原值，不要把搜尋字串留在欄位裡
+      if(input.value !== SETTINGS[key]) box._set(SETTINGS[key]);
+    }, 180));
     list.addEventListener('mousedown', e => {
       const item = e.target.closest('[data-f]'); if(!item) return;
       SETTINGS[key] = item.dataset.f; input.value = item.dataset.f;
