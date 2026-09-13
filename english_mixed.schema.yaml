@@ -1,0 +1,22 @@
+# Hidden helper schema used to compile the local English dictionary.
+schema:
+  schema_id: english_mixed
+  name: "English Mixed Helper"
+  version: "20260913"
+
+engine:
+  processors:
+    - speller
+  segmentors:
+    - abc_segmentor
+  translators:
+    - table_translator
+
+speller:
+  alphabet: abcdefghijklmnopqrstuvwxyz
+
+translator:
+  dictionary: english_mixed
+  enable_completion: true
+  enable_sentence: false
+  enable_user_dict: false

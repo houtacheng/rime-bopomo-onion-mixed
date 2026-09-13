@@ -1,0 +1,22 @@
+# macOS / Rime runtime state
+.DS_Store
+build/
+sync/
+trash/
+*.userdb/
+*.userdb.txt
+user.yaml
+installation.yaml
+
+# Personal phrases and local backups
+bopomo_onion_phrase.txt
+*.backup
+*.bak
+
+# Removed input methods
+cangjie5*
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
