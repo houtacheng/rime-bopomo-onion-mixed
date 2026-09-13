@@ -4,8 +4,10 @@
 ---
 name: english_mixed
 version: "20260913"
-sort: original
+sort: by_weight
 use_preset_vocabulary: false
+import_tables:
+  - english_tech
 columns:
   - text
   - code

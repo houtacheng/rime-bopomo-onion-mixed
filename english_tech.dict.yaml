@@ -1,0 +1,117 @@
+# Rime dictionary
+# encoding: utf-8
+# Common technology companies, products, platforms, and developer tools.
+---
+name: english_tech
+version: "20260913"
+sort: by_weight
+use_preset_vocabulary: false
+columns:
+  - text
+  - code
+  - weight
+...
+Microsoft	microsoft	100000
+Microsoft Teams	teams	100000
+Teams	teams	99900
+Windows	windows	100000
+Windows 11	windows11	99000
+Microsoft 365	microsoft365	99000
+Office	office	98000
+OneDrive	onedrive	98000
+Outlook	outlook	98000
+SharePoint	sharepoint	97000
+Azure	azure	98000
+Apple	apple	100000
+macOS	macos	100000
+iOS	ios	100000
+iPadOS	ipados	99000
+watchOS	watchos	98000
+visionOS	visionos	98000
+Xcode	xcode	98000
+TestFlight	testflight	97000
+Google	google	100000
+Google Chrome	chrome	100000
+Chrome	chrome	99900
+Chromium	chromium	98000
+Android	android	100000
+Gmail	gmail	98000
+Google Drive	googledrive	98000
+Google Docs	googledocs	97000
+Google Sheets	googlesheets	97000
+Google Meet	googlemeet	98000
+YouTube	youtube	100000
+OpenAI	openai	100000
+ChatGPT	chatgpt	100000
+Codex	codex	99000
+Claude	claude	99000
+Anthropic	anthropic	98000
+Gemini	gemini	99000
+Meta	meta	99000
+Facebook	facebook	99000
+Instagram	instagram	99000
+WhatsApp	whatsapp	99000
+Threads	threads	98000
+Amazon	amazon	99000
+AWS	aws	99000
+Amazon Web Services	amazonwebservices	97000
+NVIDIA	nvidia	99000
+Intel	intel	99000
+AMD	amd	99000
+Tesla	tesla	98000
+Samsung	samsung	98000
+Adobe	adobe	99000
+Photoshop	photoshop	99000
+Illustrator	illustrator	98000
+Premiere Pro	premiere	98000
+Acrobat	acrobat	97000
+Figma	figma	99000
+Canva	canva	99000
+Notion	notion	99000
+Slack	slack	100000
+Zoom	zoom	100000
+Discord	discord	99000
+Dropbox	dropbox	98000
+Spotify	spotify	99000
+GitHub	github	100000
+GitLab	gitlab	99000
+Bitbucket	bitbucket	97000
+Git	git	99000
+Visual Studio Code	vscode	100000
+VS Code	vscode	99900
+Visual Studio	visualstudio	98000
+JetBrains	jetbrains	98000
+IntelliJ IDEA	intellij	98000
+PyCharm	pycharm	98000
+WebStorm	webstorm	97000
+Docker	docker	100000
+Kubernetes	kubernetes	99000
+Linux	linux	100000
+Ubuntu	ubuntu	99000
+Debian	debian	97000
+Red Hat	redhat	97000
+Cloudflare	cloudflare	98000
+Firebase	firebase	98000
+Supabase	supabase	98000
+Vercel	vercel	98000
+Netlify	netlify	97000
+Node.js	nodejs	100000
+JavaScript	javascript	100000
+TypeScript	typescript	100000
+Python	python	100000
+Java	java	99000
+Kotlin	kotlin	98000
+Swift	swift	99000
+Rust	rust	99000
+Go	golang	98000
+React	react	100000
+Vue.js	vuejs	99000
+Angular	angular	98000
+Next.js	nextjs	99000
+WordPress	wordpress	98000
+PostgreSQL	postgresql	99000
+MySQL	mysql	99000
+MongoDB	mongodb	98000
+Redis	redis	98000
+SQLite	sqlite	98000
+Oracle	oracle	98000
