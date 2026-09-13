@@ -227,6 +227,8 @@ key_binder:
 ### 切分移位 ###
     - {accept: Up, send: KP_Left, when: composing} #左移一個注音
     - {accept: Up, send: Up, when: paging} #修正上條目出現的bug
+    - {accept: Left, send: Page_Up, when: paging} #候選選單優先向前翻頁
+    - {accept: Right, send: Page_Down, when: paging} #候選選單優先向後翻頁
 ##
     - {accept: Right, send: Shift+Right, when: composing} #右移一整個字
     - {accept: Shift+Right, send: Right, when: composing} #右移一個注音
@@ -239,8 +241,6 @@ key_binder:
     # - {accept: Tab, send: KP_Left, when: composing} #左移一個注音
 ### 選字翻頁 ###
     - {accept: Tab, send: Control+1, when: has_menu} #接受首選英文／候選
-    - {accept: Left, send: Page_Up, when: paging} #直式選單用 #has_menu
-    - {accept: Right, send: Page_Down, when: paging} #直式選單用 #has_menu
 #關#    - {accept: Up, send: Page_Up, when: paging} #橫式選單用
 #關#    - {accept: Down, send: Page_Down, when: paging} #橫式選單用
 #關#    - {accept: Left, send: Left, when: has_menu} #橫式選單用 #send: Shift+Up
