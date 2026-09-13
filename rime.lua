@@ -26,6 +26,7 @@ end
 local weekday = { "日", "一", "二", "三", "四", "五", "六" }
 local stems = { "甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸" }
 local branches = { "子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥" }
+local date_triggers = { ["今天"]=true, ["昨天"]=true, ["明天"]=true }
 
 local symbols = {
   ["公里"] = { "㎞", "km" }, ["公尺"] = { "m" },
@@ -94,13 +95,22 @@ end
 function date_symbol_extras(input, env)
   local expanded = {}
   for candidate in input:iter() do
-    yield(candidate)
     local values = extras_for(candidate.text)
     if values and not expanded[candidate.text] then
       expanded[candidate.text] = true
-      for _, value in ipairs(values) do
-        yield(Candidate("date_symbol", candidate.start, candidate._end, value, "〔日期／符號〕"))
+      if date_triggers[candidate.text] then
+        for _, value in ipairs(values) do
+          yield(Candidate("date_symbol", candidate.start, candidate._end, value, "〔日期〕"))
+        end
+        yield(candidate)
+      else
+        yield(candidate)
+        for _, value in ipairs(values) do
+          yield(Candidate("date_symbol", candidate.start, candidate._end, value, "〔日期／符號〕"))
+        end
       end
+    else
+      yield(candidate)
     end
   end
 end
