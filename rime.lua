@@ -99,10 +99,10 @@ function date_symbol_extras(input, env)
     if values and not expanded[candidate.text] then
       expanded[candidate.text] = true
       if date_triggers[candidate.text] then
+        yield(candidate)
         for _, value in ipairs(values) do
           yield(Candidate("date_symbol", candidate.start, candidate._end, value, "〔日期〕"))
         end
-        yield(candidate)
       else
         yield(candidate)
         for _, value in ipairs(values) do
