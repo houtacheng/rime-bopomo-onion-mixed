@@ -62,6 +62,7 @@ local function date_formats(timestamp)
   local result = {
     string.format("%04d.%02d.%02d", d.year, d.month, d.day),
     string.format("%04d.%02d.%02d(%s)", d.year, d.month, d.day, weekday[d.wday]),
+    string.format("%04d%02d%02d", d.year, d.month, d.day),
     string.format("%d 年 %d 月 %d 日", d.year, d.month, d.day),
     string.format("%04d-%02d-%02d", d.year, d.month, d.day),
     string.format("民國 %d 年 %d 月 %d 日", d.year - 1911, d.month, d.day),
@@ -112,6 +113,97 @@ function date_symbol_extras(input, env)
     else
       yield(candidate)
     end
+  end
+end
+
+-- 中文候選優先：英文候選維持彼此的相對順序，整體排到中文之後。
+-- 只降級「純 ASCII 且以字母開頭」的候選，因此日期（2026.09.13、20260913）、
+-- 數字格式（羅馬數字等，type 為 number）與標點都不受影響。
+local PROTECTED_TYPES = { date_symbol = true, number = true, punct = true }
+
+-- chinese_first 在產生候選時記下「目前第一個英文候選」，english_commit（Tab）直接取用。
+-- 兩者同在本檔共用這個 upvalue，就不必依賴 librime-lua 的候選列走訪 API。
+-- 必須在迴圈中即時寫入：濾鏡是 coroutine，消費端取滿一頁就會把它掛起，迴圈結束後的賦值不保證執行得到。
+local first_english_text = nil
+
+-- 常用英文詞的詞頻排名，來自 lua/english_common.lua。載不到就退化成「中文永遠第一」，不會壞掉。
+local COMMON_RANK = (function()
+  for _, mod in ipairs({ "english_common", "lua.english_common" }) do
+    local ok, data = pcall(require, mod)
+    if ok and type(data) == "table" then return data end
+  end
+  return {}
+end)()
+
+-- 何時讓英文排到第一位。
+-- 這是 ZingIME「無法組成注音時只剩英文」的替代方案：本方案有簡拼，任何字母序列都是合法注音，
+-- 不存在「不可能」的輸入，所以改用詞頻判斷這串輸入像不像一個常用英文單字。
+-- 門檻調寬會讓更多輸入被判為英文；設 ENGLISH_LEAD_RANK_LIMIT = 0 即完全關閉、回到中文永遠第一。
+local ENGLISH_LEAD_MIN_LENGTH = 4   -- 三個字母以內多半是注音簡拼，一律讓中文優先
+local ENGLISH_LEAD_RANK_LIMIT = 2000
+local HELD_ZH_LIMIT = 20            -- 等待英文完全相符時最多扣住幾個中文候選
+
+local function should_english_lead(raw)
+  if #raw < ENGLISH_LEAD_MIN_LENGTH then return false end
+  local rank = COMMON_RANK[raw]
+  return rank ~= nil and rank <= ENGLISH_LEAD_RANK_LIMIT
+end
+
+-- 緩衝上限：避免英文候選極多時（例如只輸入一個字母）拖慢逐頁取詞。
+-- 超過上限後改為原序輸出，屬於降級而非錯誤。
+local LATIN_BUFFER_LIMIT = 60
+
+local function is_english_candidate(cand)
+  if PROTECTED_TYPES[cand.type] then return false end
+  local text = cand.text
+  if text:find("[\128-\255]") then return false end  -- 含非 ASCII 位元組＝中文候選
+  return text:find("^%a") ~= nil                       -- 必須以 ASCII 字母開頭
+end
+
+function chinese_first(input, env)
+  local raw = (env.engine.context.input or ""):lower()
+  local latin, held_zh = {}, {}
+  local exact_taken = false
+  local lead_done = not should_english_lead(raw)
+  first_english_text = nil
+
+  local function release_held()
+    for _, c in ipairs(held_zh) do yield(c) end
+    held_zh = {}
+    lead_done = true
+  end
+
+  for cand in input:iter() do
+    if is_english_candidate(cand) then
+      if not lead_done and not exact_taken and cand.text:lower() == raw then
+        -- 英文領先：完全相符者排第一，再放行被扣住的中文候選
+        first_english_text = cand.text
+        exact_taken = true
+        yield(cand)
+        release_held()
+      elseif #latin < LATIN_BUFFER_LIMIT then
+        latin[#latin + 1] = cand
+        if #latin == 1 then first_english_text = cand.text end
+        if not exact_taken and cand.text:lower() == raw then
+          -- 完全相符者提到英文候選之首（例如打 home 就要先看到 home）
+          exact_taken = true
+          first_english_text = cand.text
+          table.insert(latin, 1, table.remove(latin, #latin))
+        end
+      else
+        yield(cand)
+      end
+    elseif lead_done then
+      yield(cand)
+    else
+      held_zh[#held_zh + 1] = cand
+      if #held_zh >= HELD_ZH_LIMIT then release_held() end
+    end
+  end
+
+  if not lead_done then release_held() end
+  for _, cand in ipairs(latin) do
+    yield(cand)
   end
 end
 
@@ -188,6 +280,9 @@ function number_formats(input, segment, env)
   end
   local raw = input:match("^#(%d+)$")
   if not raw then return end
+  -- 原始阿拉伯數字放第一位：大千配置把 0-9 全用作注音鍵，這是中文模式下打數字的出口。
+  -- 想讓中文數字排回第一位，把這行移到 normal 那兩行之後即可。
+  yield(Candidate("number", segment.start, segment._end, raw, "阿拉伯數字"))
   local normal = chinese_integer(raw, false)
   local financial = chinese_integer(raw, true)
   if normal then yield(Candidate("number", segment.start, segment._end, normal, "中文數字")) end
@@ -215,9 +310,178 @@ function simplified_hint(input, env)
   end
 end
 
-function simplified_commit(key, env)
-  local representation = key:repr()
-  if representation ~= "Shift+Right" and representation ~= "Super+Right" then
+-- 注意：Squirrel 0.18 的 SquirrelInputController.m 在 NSEventTypeKeyDown 一開始就有
+-- `if (modifiers & NSEventModifierFlagCommand) break;`（註解為 ignore Command+X hotkeys），
+-- 所有「Command＋其他鍵」都不會送進 librime，因此 Super+Right 永遠觸發不到。
+-- 簡體上屏改用 Option+→（Alt+Right）；Control+→ 不可用，會被 macOS 的切換桌面空間攔走。
+local SIMPLIFIED_KEYS = { ["Alt+Right"] = true, ["Super+Right"] = true }
+
+-- Tab：接受目前第一個英文候選（ZingIME 式的「按 Tab 表態為英文」）。
+-- 沒有英文候選時回傳 2，讓 key_binder 的 Tab → Control+1 照舊接手。
+function english_commit(key, env)
+  if key:repr() ~= "Tab" then
+    return 2
+  end
+  local context = env.engine.context
+  if not context:has_menu() or not first_english_text then
+    return 2
+  end
+  env.engine:commit_text(first_english_text)
+  first_english_text = nil
+  context:clear()
+  return 1
+end
+
+---------------------------------------------------------------------------
+-- 選中候選的完整讀音（注音文／漢語拼音）
+--
+-- 反查表 build/bopomo_onion.extended.reverse.bin 由部署時自動產生，存的是字典原始編碼：
+-- terra_pinyin 式拼音，ü 寫作 v、聲調用數字，多音節詞以空白分隔（銀行 → "yin2 hang2"）。
+---------------------------------------------------------------------------
+local REVERSE_DB_FILE = "build/bopomo_onion.extended.reverse.bin"
+local BOPOMOFO_SEPARATOR = ""    -- 想讓音節之間留空白就改成 " "
+local PINYIN_SEPARATOR = " "
+
+local CHAR_PATTERN = (utf8 and utf8.charpattern) or "[\0-\127\194-\244][\128-\191]*"
+
+local reverse_db_cache = nil
+local function reverse_db()
+  if reverse_db_cache == nil then
+    local ok, db = pcall(ReverseDb, REVERSE_DB_FILE)
+    reverse_db_cache = (ok and db) or false
+  end
+  return reverse_db_cache or nil
+end
+
+local function utf8_chars(text)
+  local chars = {}
+  for ch in text:gmatch(CHAR_PATTERN) do chars[#chars + 1] = ch end
+  return chars
+end
+
+-- 先查整詞，以保留多音字的詞彙讀音（銀行 → yin2 hang2，而不是 yin2 xing2）。
+-- 整詞回傳的分段數與字數不符時，代表拿到的是同一個字的多種讀音，改為逐字取第一個。
+-- 反查表裡不是每個編碼都是拼音。內嵌注音文（mixin_bpmf）的條目長得像「＊b」，
+-- 直接拿去轉換會產生亂碼，所以先驗格式：純小寫字母 + 可選的聲調數字。
+local function is_pinyin_code(code)
+  return code:match("^%l+[1-5]?$") ~= nil
+end
+
+local function syllables_of(text)
+  local db = reverse_db()
+  if not db then return nil end
+  local chars = utf8_chars(text)
+  if #chars == 0 then return nil end
+
+  local whole = db:lookup(text)
+  if whole and whole ~= "" then
+    local parts = {}
+    for part in whole:gmatch("%S+") do parts[#parts + 1] = part end
+    if #parts == #chars then
+      for _, part in ipairs(parts) do
+        if not is_pinyin_code(part) then parts = nil break end
+      end
+      if parts then return parts end
+    end
+  end
+
+  local out = {}
+  for i, ch in ipairs(chars) do
+    local found = db:lookup(ch)
+    local first = found and found:match("%S+")
+    if not first or not is_pinyin_code(first) then return nil end
+    out[i] = first
+  end
+  return out
+end
+
+local BOPOMOFO_SYMBOLS = {
+  b="ㄅ", p="ㄆ", m="ㄇ", f="ㄈ", d="ㄉ", t="ㄊ", n="ㄋ", l="ㄌ",
+  g="ㄍ", k="ㄎ", h="ㄏ", j="ㄐ", q="ㄑ", x="ㄒ",
+  Z="ㄓ", C="ㄔ", S="ㄕ", r="ㄖ", z="ㄗ", c="ㄘ", s="ㄙ",
+  i="ㄧ", u="ㄨ", v="ㄩ",
+  a="ㄚ", o="ㄛ", e="ㄜ", E="ㄝ", A="ㄞ", I="ㄟ", O="ㄠ", U="ㄡ",
+  M="ㄢ", N="ㄣ", K="ㄤ", G="ㄥ", R="ㄦ",
+  ["1"]="", ["2"]="ˊ", ["3"]="ˇ", ["4"]="ˋ", ["5"]="˙",   -- 一聲照慣例不標
+}
+
+-- 這串轉寫與 bopomo_onion.schema.yaml 的 speller/algebra 是同一套規則，順序必須一致：
+-- ang/eng 要在 an/en 之前，iu→iU 要在 iu→v 之前，否則會轉錯。
+local function pinyin_to_bopomofo(syllable)
+  local s = syllable
+  s = s:gsub("[%(%)]", "")
+  s = s:gsub("iu", "iU")
+  s = s:gsub("ui", "uI")
+  s = s:gsub("ong", "ung")
+  s = s:gsub("yi?", "i")
+  s = s:gsub("wu?", "u")
+  s = s:gsub("iu", "v")
+  s = s:gsub("([jqx])u", "%1v")
+  s = s:gsub("([iuv])n", "%1en")
+  s = s:gsub("zhi?", "Z")
+  s = s:gsub("chi?", "C")
+  s = s:gsub("shi?", "S")
+  s = s:gsub("([zcsr])i", "%1")
+  s = s:gsub("ai", "A"); s = s:gsub("ei", "I")
+  s = s:gsub("ao", "O"); s = s:gsub("ou", "U")
+  s = s:gsub("ang", "K"); s = s:gsub("eng", "G")
+  s = s:gsub("an", "M"); s = s:gsub("en", "N")
+  s = s:gsub("er", "R"); s = s:gsub("eh", "E")
+  s = s:gsub("([iv])e", "%1E")
+
+  local out = {}
+  for ch in s:gmatch(".") do
+    local symbol = BOPOMOFO_SYMBOLS[ch]
+    if symbol == nil then return nil end
+    out[#out + 1] = symbol
+  end
+  return table.concat(out)
+end
+
+local PINYIN_TONE_MARKS = {
+  a = { "ā", "á", "ǎ", "à" },  o = { "ō", "ó", "ǒ", "ò" },
+  e = { "ē", "é", "ě", "è" },  i = { "ī", "í", "ǐ", "ì" },
+  u = { "ū", "ú", "ǔ", "ù" },  ["ü"] = { "ǖ", "ǘ", "ǚ", "ǜ" },
+}
+
+-- 標調位置依漢語拼音正詞法：有 a 標 a，否則有 o 或 e 標之；
+-- iu 標在 u、ui 標在 i；其餘標剩下的母音。輕聲不標。
+local function pinyin_with_tone(syllable)
+  local base, tone = syllable:match("^(%a+)([1-5])$")
+  if not base then
+    base = syllable:match("^(%a+)$")
+    if not base then return nil end
+    tone = "5"
+  end
+  base = base:gsub("v", "ü")
+  local n = tonumber(tone)
+  if n == 5 then return base end
+
+  local target
+  if     base:find("a", 1, true)  then target = "a"
+  elseif base:find("o", 1, true)  then target = "o"
+  elseif base:find("e", 1, true)  then target = "e"
+  elseif base:find("iu", 1, true) then target = "u"
+  elseif base:find("ui", 1, true) then target = "i"
+  elseif base:find("ü", 1, true)  then target = "ü"
+  elseif base:find("u", 1, true)  then target = "u"
+  elseif base:find("i", 1, true)  then target = "i"
+  end
+  if not target then return base end
+  return (base:gsub(target, PINYIN_TONE_MARKS[target][n], 1))
+end
+
+local READING_KEYS = {
+  ["Shift+Right"] = "bopomofo",  -- 選中候選的完整讀音
+  ["Alt+Left"]    = "pinyin",    -- 選中候選的漢語拼音
+  ["Alt+Up"]      = "raw",       -- 所打鍵碼原樣轉注音符號（要單獨打出「ㄅ」就用這個）
+}
+
+function special_commit(key, env)
+  local repr = key:repr()
+  local mode = READING_KEYS[repr]
+  local to_simplified = SIMPLIFIED_KEYS[repr]
+  if not mode and not to_simplified then
     return 2
   end
 
@@ -225,16 +489,50 @@ function simplified_commit(key, env)
   if not context:has_menu() then
     return 2
   end
-
-  if representation == "Shift+Right" then
-    local bopomofo = raw_to_bopomofo(context.input)
-    if not bopomofo then return 2 end
-    env.engine:commit_text(bopomofo)
-  else
-    local candidate = context:get_selected_candidate()
-    if not candidate then return 2 end
-    env.engine:commit_text(tw_to_s:convert(candidate.text))
+  local candidate = context:get_selected_candidate()
+  if not candidate then
+    return 2
   end
-  context:clear()
-  return 1
+
+  if to_simplified then
+    env.engine:commit_text(tw_to_s:convert(candidate.text))
+    context:clear()
+    return 1
+  end
+
+  if mode == "raw" then
+    local typed = raw_to_bopomofo(context.input)
+    if not typed then return 2 end
+    env.engine:commit_text(typed)
+    context:clear()
+    return 1
+  end
+
+  local syllables = syllables_of(candidate.text)
+  if syllables then
+    local parts = {}
+    for i, syllable in ipairs(syllables) do
+      if mode == "pinyin" then
+        parts[i] = pinyin_with_tone(syllable) or syllable
+      else
+        parts[i] = pinyin_to_bopomofo(syllable) or syllable
+      end
+    end
+    local sep = (mode == "pinyin") and PINYIN_SEPARATOR or BOPOMOFO_SEPARATOR
+    env.engine:commit_text(table.concat(parts, sep))
+    context:clear()
+    return 1
+  end
+
+  -- 反查不到讀音（英文候選、符號、內嵌注音文等）。
+  -- 注音沿用原本的行為：把打下去的鍵碼直接轉成注音符號；拼音則不處理，交回給後面的元件。
+  if mode == "bopomofo" then
+    local typed = raw_to_bopomofo(context.input)
+    if typed then
+      env.engine:commit_text(typed)
+      context:clear()
+      return 1
+    end
+  end
+  return 2
 end

@@ -37,6 +37,7 @@ engine:
   filters:
 #     - charset_filter@big5
 #     - charset_filter@gbk
+    - lua_filter@chinese_first
     - simplifier@zh_cn
     - lua_filter@date_symbol_extras
     - lua_filter@simplified_hint
@@ -44,7 +45,8 @@ engine:
   processors:
     - ascii_composer
     - recognizer
-    - lua_processor@simplified_commit
+    - lua_processor@special_commit
+    - lua_processor@english_commit
     - key_binder
     - speller
     - punctuator
@@ -150,7 +152,7 @@ english:
   enable_completion: true
   enable_sentence: false
   enable_user_dict: true
-  initial_quality: 1
+  initial_quality: 0 #原為 1，等於讓英文無條件多拿 +1 底分而壓過中文；改 0 後一般情況中文自然在前，lua_filter@chinese_first 則是保證。
 ############################## 以下為短語 ##########################################
 # custom_phrase:
 #   dictionary: ""
@@ -225,13 +227,18 @@ key_binder:
     - {accept: equal, send: equal, when: has_menu}
     - {accept: equal, send: equal, when: paging}
 ### 切分移位 ###
-    - {accept: Up, send: KP_Left, when: composing} #左移一個注音
-    - {accept: Up, send: Up, when: paging} #修正上條目出現的bug
-    - {accept: Left, send: Page_Up, when: paging} #候選選單優先向前翻頁
-    - {accept: Right, send: Page_Down, when: paging} #候選選單優先向後翻頁
+    - {accept: Up, send: Down, when: has_menu} #就地換下一個候選；需搭配 squirrel.custom.yaml 的 style/inline_candidate: true
+    - {accept: Up, send: KP_Left, when: composing} #無候選選單時才左移一個注音
+    - {accept: Left, send: Page_Up, when: has_menu} #候選選單優先向前翻頁
+    - {accept: Right, send: Page_Down, when: has_menu} #候選選單優先向後翻頁
 ##
-    - {accept: Right, send: Shift+Right, when: composing} #右移一整個字
-    - {accept: Shift+Right, send: Right, when: composing} #右移一個注音
+# 以下兩條已停用，原因見下：
+# lua_processor@special_commit 排在 key_binder 之前，且以 Shift+Right 作為「輸出注音文」的觸發鍵。
+# key_binder 的 send: 會把按鍵從處理鏈頭部重新送一次，lua 無法分辨那是使用者真的按下 Shift+Right，
+# 還是 key_binder 轉送過來的。因此只要有任何規則 send: Shift+Right，按該鍵就會誤觸發注音文上屏。
+# 結論：只要 Shift+Right 歸 lua 所有，就不可以有任何 key_binder 規則 send: Shift+Right。
+#關#    - {accept: Right, send: Shift+Right, when: composing} #右移一整個字
+#關#    - {accept: Shift+Right, send: Right, when: composing} #右移一個注音（本條亦被 lua 搶先攔截，無效）
     - {accept: Shift+Left, send: KP_Left, when: composing} #左移一個注音
 #關#    - {accept: Shift+space, send: Shift+Right, when: composing} #首節
     # - {accept: Shift+space, send: KP_Left, when: composing} #左移一個注音
@@ -251,7 +258,7 @@ key_binder:
 #關#    - {accept: Shift+Tab, send: Page_Up, when: paging} #選字時「Shift」+「tab」翻頁。
 #關#    - {accept: Tab, send: Page_Down, when: has_menu} #「tab」翻頁。
     - {accept: Shift+C, send: Page_Up, when: has_menu}
-    - {accept: Shift+space, send: Page_Down, when: has_menu} #選字時「Shift」+「空白鍵」翻頁。 #send: Right #send: Down
+#關#    - {accept: Shift+space, send: Page_Down, when: has_menu} #已停用：Shift+space 由 default.custom 用於切換中英（when: always），此行永遠觸發不到。
     - {accept: Shift+I, send: Page_Up, when: has_menu}
     - {accept: Shift+K, send: Page_Down, when: has_menu}
 #左邊選字
@@ -303,14 +310,14 @@ key_binder:
 ### 功能快捷鍵 ###
     # - {accept: Return, send: space, when: has_menu}
 ### 避聲調重複按 ###
-    - {accept: 3, send: Escape, when: composing}
-    - {accept: 3, send: 3, when: has_menu}
-    - {accept: 4, send: Escape, when: composing}
-    - {accept: 4, send: 4, when: has_menu}
-    - {accept: 6, send: Escape, when: composing}
-    - {accept: 6, send: 6, when: has_menu}
-    - {accept: 7, send: Escape, when: composing}
-    - {accept: 7, send: 7, when: has_menu}
+    - {accept: 3, send: 3, when: has_menu} #有候選時正常輸入聲調
+    - {accept: 3, send: Escape, when: composing} #空碼時才清除
+    - {accept: 4, send: 4, when: has_menu} #有候選時正常輸入聲調
+    - {accept: 4, send: Escape, when: composing} #空碼時才清除
+    - {accept: 6, send: 6, when: has_menu} #有候選時正常輸入聲調
+    - {accept: 6, send: Escape, when: composing} #空碼時才清除
+    - {accept: 7, send: 7, when: has_menu} #有候選時正常輸入聲調
+    - {accept: 7, send: Escape, when: composing} #空碼時才清除
 ### ctrl 打出標點 ###
 #關#    - {accept: "Control+comma", send: "less", when: always} #「逗號」#接受「Contol」+「,」直出「<」
 #關#    - {accept: "Control+period", send: "greater", when: always} #「句號」#接受「Contol」+「.」直出「>」
