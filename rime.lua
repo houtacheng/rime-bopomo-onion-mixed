@@ -38,7 +38,26 @@ local symbols = {
   ["金牛"] = { "♉" }, ["雙子"] = { "♊" }, ["巨蟹"] = { "♋" },
   ["獅子"] = { "♌" }, ["處女"] = { "♍" }, ["天秤"] = { "♎" },
   ["天蠍"] = { "♏" }, ["射手"] = { "♐" }, ["摩羯"] = { "♑" },
-  ["株"] = { "㈱" }, ["滿"] = { "🈵" }
+  ["株"] = { "㈱" }, ["滿"] = { "🈵" },
+
+  -- 溫度與角度
+  ["度"] = { "°", "℃", "℉" }, ["角度"] = { "°" }, ["溫度"] = { "℃", "℉" },
+  -- 長度
+  ["微米"] = { "㎛" }, ["奈米"] = { "㎚" },
+  ["英吋"] = { "″", "in" }, ["英尺"] = { "′", "ft" }, ["英里"] = { "mi" },
+  ["平方公里"] = { "㎢" }, ["平方公分"] = { "㎠" }, ["立方公分"] = { "㎤", "cc" },
+  -- 容量與重量
+  ["公升"] = { "ℓ", "L" }, ["毫升"] = { "㎖", "ml" }, ["公噸"] = { "t" },
+  ["毫克"] = { "㎎" }, ["磅"] = { "lb" }, ["盎司"] = { "oz" },
+  -- 電與功率
+  ["瓦"] = { "W" }, ["千瓦"] = { "㎾" }, ["歐姆"] = { "Ω" },
+  ["伏特"] = { "V" }, ["安培"] = { "A" }, ["分貝"] = { "㏈" },
+  -- 頻率與時間
+  ["赫茲"] = { "㎐" }, ["千赫"] = { "㎑" }, ["兆赫"] = { "㎒" }, ["吉赫"] = { "㎓" },
+  ["毫秒"] = { "㎳" }, ["微秒"] = { "㎲" }, ["奈秒"] = { "㎱" },
+  -- 比例與其他
+  ["百分比"] = { "%", "％" }, ["千分比"] = { "‰" }, ["萬分比"] = { "‱" },
+  ["帕"] = { "㎩" }, ["卡路里"] = { "㎈", "cal" },
 }
 
 local function ganzhi(year)
@@ -131,11 +150,11 @@ local function time_formats(timestamp)
   local same_day = d.year == today.year and d.month == today.month and d.day == today.day
   local out = { os.date("%H:%M", timestamp), os.date("%H:%M:%S", timestamp) }
   if same_day then
-    table.insert(out, string.format("%d 時 %d 分", d.hour, d.min))
+    table.insert(out, string.format("%d 點 %d 分", d.hour, d.min))
   else
     -- 跨日了，只給時分會看不出是哪天
     table.insert(out, os.date("%Y-%m-%d %H:%M", timestamp))
-    table.insert(out, string.format("%d 月 %d 日 %d 時 %d 分", d.month, d.day, d.hour, d.min))
+    table.insert(out, string.format("%d 月 %d 日 %d 點 %d 分", d.month, d.day, d.hour, d.min))
   end
   table.insert(out, os.date("%Y-%m-%d %H:%M:%S", timestamp))
   return out
@@ -148,9 +167,21 @@ end
 
 local FIXED_DAYS = { ["後天"] = 2, ["大後天"] = 3, ["前天"] = -2, ["大前天"] = -3 }
 
+-- 在日期格式中插入「原詞＋日期」的併排形式。
+-- 放在最常用的兩個格式之後（第 3、4 位），這樣加上原詞本身剛好佔滿第一頁六格。
+local function date_formats_with_word(word, timestamp)
+  local values = date_formats(timestamp)
+  local d = os.date("*t", timestamp)
+  local plain = string.format("%04d.%02d.%02d", d.year, d.month, d.day)
+  local dated = string.format("%04d.%02d.%02d(%s)", d.year, d.month, d.day, weekday[d.wday])
+  table.insert(values, 3, word .. "（" .. plain .. "）")
+  table.insert(values, 4, word .. " " .. dated)
+  return values
+end
+
 local function relative_time(text)
   local days = FIXED_DAYS[text]
-  if days then return date_formats(os.time() + days * 86400), "〔日期〕" end
+  if days then return date_formats_with_word(text, os.time() + days * 86400), "〔日期〕" end
 
   local sign, rest
   for _, entry in ipairs(REL_DIRECTIONS) do
@@ -187,7 +218,7 @@ local function relative_time(text)
         -- 但一般人期望的是 2/28。
         d.day = math.min(d.day, days_in_month(d.year, d.month))
       end
-      return date_formats(os.time(d)), "〔日期〕"
+      return date_formats_with_word(text, os.time(d)), "〔日期〕"
     end
   end
   return nil
@@ -199,9 +230,9 @@ local function extras_for(text)
   if text == "今年" then return year_formats(d.year) end
   if text == "去年" then return year_formats(d.year - 1) end
   if text == "明年" then return year_formats(d.year + 1) end
-  if text == "今天" then return date_formats(now), "〔日期〕" end
-  if text == "昨天" then return date_formats(now - 86400), "〔日期〕" end
-  if text == "明天" then return date_formats(now + 86400), "〔日期〕" end
+  if text == "今天" then return date_formats_with_word(text, now), "〔日期〕" end
+  if text == "昨天" then return date_formats_with_word(text, now - 86400), "〔日期〕" end
+  if text == "明天" then return date_formats_with_word(text, now + 86400), "〔日期〕" end
   if text == "現在" then
     return { os.date("%H:%M", now), os.date("%H:%M:%S", now),
              os.date("%Y-%m-%d %H:%M:%S", now) }, "〔時間〕"
