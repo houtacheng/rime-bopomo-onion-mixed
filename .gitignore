@@ -24,4 +24,5 @@ cangjie5*
 # 外觀編輯器的執行期資料
 tools/rime-appearance/snapshots/
 tools/rime-appearance/.fonts.json
+tools/rime-appearance/app/build/
 __pycache__/

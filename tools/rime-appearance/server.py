@@ -20,11 +20,26 @@ import webbrowser
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-RIME_DIR = os.path.abspath(os.path.join(HERE, "..", ".."))
+
+
+def _detect_rime_dir():
+    """從 repo 內執行時用相對路徑；打包成 app 後 HERE 在 bundle 裡，改用預設位置。"""
+    env = os.environ.get("RIME_USER_DIR")
+    if env and os.path.exists(os.path.join(env, "squirrel.custom.yaml")):
+        return os.path.abspath(env)
+    guess = os.path.abspath(os.path.join(HERE, "..", ".."))
+    if os.path.exists(os.path.join(guess, "squirrel.custom.yaml")):
+        return guess
+    return os.path.expanduser("~/Library/Rime")
+
+
+RIME_DIR = _detect_rime_dir()
 CUSTOM = os.path.join(RIME_DIR, "squirrel.custom.yaml")
 BUILT = os.path.join(RIME_DIR, "build", "squirrel.yaml")
-SNAP_DIR = os.path.join(HERE, "snapshots")
-FONT_CACHE = os.path.join(HERE, ".fonts.json")
+# 快照與快取跟著設定檔走，不放在 bundle 裡（bundle 可能唯讀，也不該塞使用者資料）
+STATE_DIR = os.path.join(RIME_DIR, "tools", "rime-appearance")
+SNAP_DIR = os.path.join(STATE_DIR, "snapshots")
+FONT_CACHE = os.path.join(STATE_DIR, ".fonts.json")
 SQUIRREL_APP = "/Library/Input Methods/Squirrel.app"
 SQUIRREL_BIN = os.path.join(SQUIRREL_APP, "Contents/MacOS/Squirrel")
 SHARED = os.path.join(SQUIRREL_APP, "Contents/SharedSupport/squirrel.yaml")
@@ -511,19 +526,22 @@ def main():
         sys.exit("找不到 %s" % CUSTOM)
     if not os.path.exists(SQUIRREL_BIN):
         print("警告：找不到鼠鬚管，套用後無法自動部署。", file=sys.stderr)
+    os.makedirs(STATE_DIR, exist_ok=True)
     if not os.path.exists(FONT_CACHE):
         print("首次啟動，正在讀取系統字型（約 15 秒）…", flush=True)
         read_fonts()
     with socketserver.TCPServer(("127.0.0.1", 0), Handler) as httpd:
         port = httpd.server_address[1]
         url = "http://127.0.0.1:%d/" % port
-        print("鼠鬚管外觀編輯器：%s" % url)
-        print("設定檔：%s" % CUSTOM)
-        print("按 Control+C 結束。")
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
+        print("鼠鬚管外觀編輯器：%s" % url, flush=True)
+        print("設定檔：%s" % CUSTOM, flush=True)
+        print("按 Control+C 結束。", flush=True)
+        # app 版自己用 WKWebView 載入，不要再開瀏覽器
+        if "--no-browser" not in sys.argv:
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

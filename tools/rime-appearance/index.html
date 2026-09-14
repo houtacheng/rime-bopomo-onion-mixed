@@ -450,8 +450,9 @@ function render(){
   const pad = Math.max(0, Number(S.border_height ?? 0));
   const padX = Math.max(0, Number(S.border_width ?? 0));
   const rows = [
-    ['QY','你好','〔你好〕'], ['AH','妳好',''], ['ZN','尼好',''],
-    ['WU','擬好',''], ['SJ','你號',''], ['XM','泥好','']
+    ['QY','菩提道次第廣論','〔菩提道次第广论〕'],
+    ['AH','菩提道次第略論','〔菩提道次第略论〕'],
+    ['ZN','菩提道',''], ['WU','菩提',''], ['SJ','普提',''], ['XM','蒲提','']
   ];
   const fmt = formatParts(S.candidate_format);
   const cell = (label, text, comment, hi) => {
@@ -469,7 +470,7 @@ function render(){
 
   const preedit = S.inline_preedit ? '' :
     `<div style="font-family:'${S.font_face}',sans-serif;font-size:${S.font_point}px;
-      color:${textCol};padding:0 6px ${Math.max(0,Number(S.spacing||0))}px">ㄋㄧˇㄏㄠˇ</div>`;
+      color:${textCol};padding:0 6px ${Math.max(0,Number(S.spacing||0))}px">ㄆㄨˊㄊㄧˊㄉㄠˋㄘˋㄉㄧˋㄍㄨㄤˇㄌㄨㄣˋ</div>`;
 
   $('#stage').innerHTML = `
     <div class="panel ${S.candidate_list_layout==='linear'?'linear':''}"

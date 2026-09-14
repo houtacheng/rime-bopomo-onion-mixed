@@ -2,11 +2,26 @@
 
 本機 GUI，用來調整 `squirrel.custom.yaml` 的外觀設定。
 
+## 打包成 app（建議）
+
+```bash
+~/Library/Rime/tools/rime-appearance/app/build.sh --install
+```
+
+建置一個 macOS app 並安裝到 `/Applications`，之後從 Launchpad 開啟即可，
+不經過瀏覽器。需要 Xcode 命令列工具（`xcode-select --install`）。
+
+app 是一層 Swift 外殼：啟動時把隨附的 `server.py` 當子程序跑起來，
+讀出它印出的網址後用 WKWebView 載入；關閉 app 時一併收掉子程序。
+設定檔與快照仍然指向 `~/Library/Rime`，不會寫進 app bundle。
+
+## 直接執行（不打包）
+
 ```bash
 python3 ~/Library/Rime/tools/rime-appearance/server.py
 ```
 
-會自動開啟瀏覽器。按 `Control + C` 結束。
+會自動開啟瀏覽器。按 `Control + C` 結束。加 `--no-browser` 可以不開。
 
 ## 功能
 

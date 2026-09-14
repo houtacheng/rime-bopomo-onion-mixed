@@ -550,10 +550,14 @@ function english_commit(key, env)
   return 1
 end
 
+-- 與「按住修飾鍵看讀音」對稱：按住 Shift 看注音 → Shift+→ 輸出；按住 Control 看拼音 → Control+→ 輸出。
+-- Control+→ 需要先在系統設定停用「調度中心 → 移到右邊一個空間」，否則會被 macOS 攔走；
+-- Option+← 不受影響，保留當後備。
 local READING_KEYS = {
-  ["Shift+Right"] = "bopomofo",  -- 選中候選的完整讀音
-  ["Alt+Left"]    = "pinyin",    -- 選中候選的漢語拼音
-  ["Alt+Up"]      = "raw",       -- 所打鍵碼原樣轉注音符號（要單獨打出「ㄅ」就用這個）
+  ["Shift+Right"]   = "bopomofo",  -- 選中候選的完整注音
+  ["Control+Right"] = "pinyin",    -- 選中候選的漢語拼音
+  ["Alt+Left"]      = "pinyin",    -- 同上，不需改系統設定的後備鍵
+  ["Alt+Up"]        = "raw",       -- 所打鍵碼原樣轉注音符號（要單獨打出「ㄅ」就用這個）
 }
 
 function special_commit(key, env)

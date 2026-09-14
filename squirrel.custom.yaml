@@ -4,20 +4,20 @@
 patch:
 
 # ── 配色 ──────────────────────────────────────────────────────────
-  style/color_scheme: luna                     # 亮色主題
-  style/color_scheme_dark: mac_dark            # 暗色主題；想跟亮色一致就改成 luna
+  style/color_scheme: sunda # 亮色主題
+  style/color_scheme_dark: sunda # 暗色主題；想跟亮色一致就改成 luna
 
 # ── 版面 ──────────────────────────────────────────────────────────
-  style/candidate_list_layout: stacked         # stacked 每個候選另起一行；linear 首尾相連成一串
-  style/text_orientation: horizontal           # horizontal 橫排；vertical 豎排
-  style/inline_preedit: false                  # false 為雙行顯示：候選窗頂端保留正在打的注音預覽
-  style/inline_candidate: true                 # 選中候選就地顯示在游標處，上下鍵選字時即時改寫
+  style/candidate_list_layout: stacked # stacked 每個候選另起一行；linear 首尾相連成一串
+  style/text_orientation: horizontal # horizontal 橫排；vertical 豎排
+  style/inline_preedit: false # false 為雙行顯示：候選窗頂端保留正在打的注音預覽
+  style/inline_candidate: true # 選中候選就地顯示在游標處，上下鍵選字時即時改寫
                                                # 註：終端機與 Electron 應用程式對行內編輯支援不一，
                                                # 有異常就改回 false，或在 app_options 對該程式設 no_inline: true
-  style/status_message_type: mix               # 切換方案時的提示樣式：long | short | mix
-  style/mutual_exclusive: false                # 候選窗與狀態提示是否互斥顯示
-  style/memorize_size: true                    # linear 版面下記住候選窗長度，避免首選位置跳動
-  style/show_paging: false                     # 候選窗是否顯示翻頁指示（Squirrel 1.x 起支援）
+  style/status_message_type: mix # 切換方案時的提示樣式：long | short | mix
+  style/mutual_exclusive: false # 候選窗與狀態提示是否互斥顯示
+  style/memorize_size: true # linear 版面下記住候選窗長度，避免首選位置跳動
+  style/show_paging: false # 候選窗是否顯示翻頁指示（Squirrel 1.x 起支援）
 
 # ── 候選格式 ──────────────────────────────────────────────────────
   style/candidate_format: '[label]. [candidate] [comment]'
@@ -25,28 +25,41 @@ patch:
                                                # 舊寫法 %c / %@ 仍可用，會被自動轉換成 [label] 與 [candidate] [comment]
 
 # ── 字型 ──────────────────────────────────────────────────────────
-  style/font_face: "LiGothicMed"               # 候選字與輸入碼
+  style/font_face: 'PingFangTC-Light' # 候選字與輸入碼
   style/font_point: 20
-  style/comment_font_face: "PingFangTC-Light"  # 提示碼
-  style/comment_font_point: 17
-  style/label_font_face: "Andale Mono"         # 前標號
+  style/comment_font_face: 'PingFangSC-Light' # 提示碼
+  style/comment_font_point: 14
+  style/label_font_face: 'Andale Mono' # 前標號
   style/label_font_point: 14
   # style/base_offset: 2                       # 文字垂直位置微調（正數向上／右）
 
 # ── 幾何 ──────────────────────────────────────────────────────────
-  style/corner_radius: 7                       # 窗口圓角
-  style/hilited_corner_radius: 0               # 候選條圓角
-  style/border_height: -2                      # 窗口邊界高度（需大於圓角半徑才看得出效果）
-  style/border_width: -2                       # 窗口邊界寬度
-  style/line_spacing: 5                        # 候選列之間的間隙
-  style/spacing: 8                             # 輸入碼區與候選區的間距
+  style/corner_radius: 7 # 窗口圓角
+  style/hilited_corner_radius: 0 # 候選條圓角
+  style/border_height: -2 # 窗口邊界高度（需大於圓角半徑才看得出效果）
+  style/border_width: -2 # 窗口邊界寬度
+  style/line_spacing: 0 # 候選列之間的間隙
+  style/spacing: 0 # 輸入碼區與候選區的間距
   # style/surrounding_extra_expansion: 5       # 非高亮候選項背景框縮放
 
 # ── 視覺效果 ──────────────────────────────────────────────────────
-  style/alpha: 1                               # 整體不透明度（0–1）
-  style/translucency: false                    # 毛玻璃背景（背景色半透明時才看得到）
+  style/alpha: 1 # 整體不透明度（0–1）
+  style/translucency: false # 毛玻璃背景（背景色半透明時才看得到）
 
 ###################################################
+
+  preset_color_schemes/sunda:
+    name: "sunda"
+    author: "rime-appearance"
+    back_color: 0x000000
+    border_color: 0x00dddddd
+    text_color: 0xffffff
+    candidate_text_color: 0xffffff
+    comment_text_color: 0x888888
+    label_color: 0x888888
+    hilited_candidate_text_color: 0xffffff
+    hilited_candidate_back_color: 0x85f66e3b
+
   preset_color_schemes/lost_temple_border:
     name: "孤寺(邊)／Lost Temple (br)"
     author: "佛振 <chen.sst@gmail.com>, based on ir_black"
