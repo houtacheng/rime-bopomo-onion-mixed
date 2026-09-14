@@ -364,17 +364,9 @@ Ctrl+\ 1 2 3
 
 ### 外觀
 
-附了一個外觀編輯器，有即時預覽、字型預覽、配色編輯與快照還原。建議打包成 app 使用：
-
-```bash
-~/Library/Rime/tools/rime-appearance/app/build.sh --install
-```
-
-裝好後從 Launchpad 開啟。也可以不打包直接執行：
-
-```bash
-python3 ~/Library/Rime/tools/rime-appearance/server.py
-```
+外觀可以用 **[鼠鬚管外觀編輯器](https://github.com/houtacheng/rime-appearance-editor)** 調整（獨立專案），
+有即時預覽、字型預覽、配色編輯與快照還原。[下載 DMG](https://github.com/houtacheng/rime-appearance-editor/releases/latest)，
+或 `git clone` 後執行 `./app/build.sh --install`。
 
 也可以直接編輯 [`squirrel.custom.yaml`](../squirrel.custom.yaml)，已分為配色／版面／候選格式／字型／幾何／視覺效果六組。幾個常動的：
 

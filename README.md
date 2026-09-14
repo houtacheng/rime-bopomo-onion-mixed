@@ -91,14 +91,16 @@ macOS 鼠鬚管（Squirrel）設定，以**洋蔥純注音**為基礎，加上�
 
 ## 外觀編輯器
 
-附一個本機 GUI，可以調字型與配色、即時預覽、套用後自動部署，並保留快照隨時退回：
+外觀（字型、配色、版面）可以用 **[鼠鬚管外觀編輯器](https://github.com/houtacheng/rime-appearance-editor)** 調整——
+即時預覽、字型逐項用自己的字型渲染、套用後自動部署、快照隨時還原。
+
+[下載 DMG](https://github.com/houtacheng/rime-appearance-editor/releases/latest)（universal，macOS 13+），或自己建置：
 
 ```bash
-python3 ~/Library/Rime/tools/rime-appearance/server.py
+git clone https://github.com/houtacheng/rime-appearance-editor.git && cd rime-appearance-editor && ./app/build.sh --install
 ```
 
-字型清單會列出本機所有字型，**每個項目都用它自己的字型渲染**，選之前就看得到長相。
-詳見 [tools/rime-appearance/README.md](tools/rime-appearance/README.md)。
+它是獨立專案，不限於本方案，任何鼠鬚管設定都能用。
 
 ## 檔案結構
 
@@ -115,7 +117,6 @@ python3 ~/Library/Rime/tools/rime-appearance/server.py
 | `default.custom.yaml` | 全域鍵位與方案清單 |
 | `squirrel.custom.yaml` | 外觀設定與配色 |
 | `essay-zh-hant-mc.txt` | 詞頻語料 |
-| `tools/rime-appearance/` | 外觀編輯器（本機 GUI） |
 
 ---
 
