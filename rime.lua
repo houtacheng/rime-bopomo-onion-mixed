@@ -460,6 +460,14 @@ local function user_data_path(name)
   return dir .. "/" .. name
 end
 
+-- 排錯用：建立這個檔案後，按下的修飾鍵 repr 會被記錄下來；刪掉檔案即停止。
+local DEBUG_KEYS = (function()
+  local path = user_data_path("tools/.debug-keys")
+  local fh = io.open(path, "r")
+  if fh then fh:close() return path end
+  return nil
+end)()
+
 local GLOSS_PATH = user_data_path("english_gloss.txt")
 local gloss_handle, gloss_size
 
@@ -531,13 +539,35 @@ function simplified_hint(input, env)
   for _, entry in ipairs(PREVIEW_OPTIONS) do
     if context:get_option(entry.option) then preview = entry break end
   end
+  if DEBUG_KEYS then
+    local fh = io.open(DEBUG_KEYS, "a")
+    if fh then
+      fh:write(string.format("%s   [filter] preview=%s  bopomofo=%s pinyin=%s english=%s\n",
+        os.date("%H:%M:%S"), preview and preview.mode or "nil",
+        tostring(context:get_option("preview_bopomofo")),
+        tostring(context:get_option("preview_pinyin")),
+        tostring(context:get_option("preview_english"))))
+      fh:close()
+    end
+  end
 
+  local logged = false
   for candidate in input:iter() do
     local comment = candidate.comment
     if preview then
       local reading = (preview.mode == "english")
         and gloss_of(candidate.text)
         or reading_of(candidate.text, preview.mode)
+      if DEBUG_KEYS and not logged then
+        logged = true
+        local fh = io.open(DEBUG_KEYS, "a")
+        if fh then
+          fh:write(string.format("  [cand] mode=%s text=%q reading=%q 原註解=%q\n",
+            preview.mode, tostring(candidate.text), tostring(reading),
+            tostring(candidate.comment)))
+          fh:close()
+        end
+      end
       if reading then
         comment = preview.open .. reading .. preview.close
       end
@@ -552,13 +582,6 @@ function simplified_hint(input, env)
 end
 
 -- 按住 Shift 看注音、按住 Control 看漢語拼音。放開就恢復簡體提示。
--- 排錯用：建立這個檔案後，按下的修飾鍵 repr 會被記錄下來；刪掉檔案即停止。
-local DEBUG_KEYS = (function()
-  local path = user_data_path("tools/.debug-keys")
-  local fh = io.open(path, "r")
-  if fh then fh:close() return path end
-  return nil
-end)()
 
 local PREVIEW_MODIFIERS = {
   Shift_L = "preview_bopomofo", Shift_R = "preview_bopomofo",
@@ -576,35 +599,83 @@ end
 
 function reading_preview(key, env)
   local name = bare_key_name(key)
+  -- 排錯用：建立 tools/.debug-keys 後，所有按鍵的 repr 會被記錄下來。
+  -- 只記非單一字元的鍵（修飾鍵與組合鍵），免得每打一個注音就寫一行。
   if DEBUG_KEYS then
-    local fh = io.open(DEBUG_KEYS, "a")
-    if fh then
-      fh:write(string.format("%s\trelease=%s\tbare=%s\n",
-                             key:repr(), tostring(key:release()), name))
-      fh:close()
+    local repr = key:repr()
+    if #repr > 1 then
+      local fh = io.open(DEBUG_KEYS, "a")
+      if fh then
+        fh:write(string.format("%s %-28s release=%-5s bare=%-12s shift=%s ctrl=%s alt=%s super=%s\n",
+                               os.date("%H:%M:%S"), repr, tostring(key:release()), name,
+                               tostring(key:shift()), tostring(key:ctrl()),
+                               tostring(key:alt()), tostring(key:super())))
+        fh:close()
+      end
     end
   end
-  local option = PREVIEW_MODIFIERS[name]
-  if not option then return 2 end
-  local context = env.engine.context
-  local want = not key:release()
-  if context:get_option(option) == want then return 2 end
 
-  -- set_option 會讓 librime 重跑 RefreshNonConfirmedComposition（engine.cc 的 OnOptionUpdate），
-  -- 而那會把高亮歸零。先記下再還原，否則選到第 3 個候選時一按 Shift 就跳回第 1 個。
-  local index = 0
-  pcall(function()
-    local composition = context.composition
-    if composition and not composition:empty() then
-      index = composition:back().selected_index or 0
+  local context = env.engine.context
+  local option = PREVIEW_MODIFIERS[name]
+
+  -- 修飾鍵：按下時開啟預覽。
+  --
+  -- 不能用「放開就關掉」。Windows 的小狼毫不管按多久，按下與放開都在同一瞬間送達
+  -- （實測時間戳完全相同），那樣預覽會開了又立刻關掉，只看得到一閃。
+  -- 改成由下一個非修飾鍵關閉，兩個平台行為一致。
+  -- 沒在組字時清掉殘留的預覽狀態，否則上次留下的模式會跟到下一次輸入
+  if not context:is_composing() then
+    for _, entry in ipairs(PREVIEW_OPTIONS) do
+      if context:get_option(entry.option) then
+        context:set_option(entry.option, false)
+      end
     end
-  end)
-  context:set_option(option, want)
-  if index > 0 and context:has_menu() then
-    pcall(function() context:highlight(index) end)
   end
-  return 2   -- 不吃掉按鍵，修飾鍵的其他用途照常
+
+  if option then
+    if key:release() then return 2 end
+    -- 再按一次同一個修飾鍵就關掉，不必等別的鍵
+    if context:get_option(option) then
+      context:set_option(option, false)
+      return context:has_menu() and 1 or 2
+    end
+
+    local index = 0
+    pcall(function()
+      local composition = context.composition
+      if composition and not composition:empty() then
+        index = composition:back().selected_index or 0
+      end
+    end)
+    -- 切換模式時先關掉別的，免得兩個同時開著
+    for _, entry in ipairs(PREVIEW_OPTIONS) do
+      if entry.option ~= option and context:get_option(entry.option) then
+        context:set_option(entry.option, false)
+      end
+    end
+    -- set_option 會讓 librime 重跑 RefreshNonConfirmedComposition（engine.cc 的
+    -- OnOptionUpdate），而那會把高亮歸零。先記下再還原。
+    context:set_option(option, true)
+    if index > 0 and context:has_menu() then
+      pcall(function() context:highlight(index) end)
+    end
+    if DEBUG_KEYS then
+      local fh = io.open(DEBUG_KEYS, "a")
+      if fh then
+        fh:write(string.format("%s   [proc] 開啟 %s  讀回=%s  has_menu=%s  highlight=%d\n",
+          os.date("%H:%M:%S"), option, tostring(context:get_option(option)),
+          tostring(context:has_menu()), index))
+        fh:close()
+      end
+    end
+    -- 有候選列時吃掉這個按鍵，組字中應用程式本來就收不到，
+    -- 也不影響 Shift+字母 那組選字鍵（那是不同的事件）。
+    return context:has_menu() and 1 or 2
+  end
+
+  return 2
 end
+
 
 -- Control + 數字：直接上屏阿拉伯數字。
 -- 只在「沒有組字」時攔截：組字中 Control+1~6 是選第 N 個候選，而且 Tab 與 Shift+Q 等鍵
@@ -626,7 +697,14 @@ end
 -- `if (modifiers & NSEventModifierFlagCommand) break;`（註解為 ignore Command+X hotkeys），
 -- 所有「Command＋其他鍵」都不會送進 librime，因此 Super+Right 永遠觸發不到。
 -- 簡體上屏改用 Option+→（Alt+Right）；Control+→ 不可用，會被 macOS 的切換桌面空間攔走。
-local SIMPLIFIED_KEYS = { ["Alt+Right"] = true, ["Super+Right"] = true }
+-- Windows 上 Alt + 方向鍵到不了輸入法（Windows 把 Alt 當選單鍵，Parallels 還會轉成
+-- Win 鍵，而 Win+→ 是系統的視窗貼齊快捷鍵）。Control 配方向鍵兩個平台都正常，
+-- 所以主鍵位用 Control+←；Alt+→ 保留給 macOS 的既有習慣。
+local SIMPLIFIED_KEYS = {
+  ["Control+Right"] = true,  -- 兩個平台都可用
+  ["Alt+Right"] = true,      -- macOS 既有鍵位
+  ["Super+Right"] = true,
+}
 
 -- Tab：接受目前第一個英文候選（ZingIME 式的「按 Tab 表態為英文」）。
 -- 沒有英文候選時回傳 2，讓 key_binder 的 Tab → Control+1 照舊接手。
@@ -647,22 +725,41 @@ end
 -- 與「按住修飾鍵看讀音」對稱：按住 Shift 看注音 → Shift+→ 輸出；按住 Control 看拼音 → Control+→ 輸出。
 -- Control+→ 需要先在系統設定停用「調度中心 → 移到右邊一個空間」，否則會被 macOS 攔走；
 -- Option+← 不受影響，保留當後備。
+-- 英文釋義刻意沒有直接組合鍵：唯一可用的會是 Alt+方向鍵，而那在 Windows 上到不了
+-- 輸入法（Alt 的按住狀態在方向鍵抵達前就被放開）。英文一律走「按 Option 開預覽、
+-- 再按 →」，兩個平台操作完全一致。
 local READING_KEYS = {
   ["Shift+Right"]   = "bopomofo",  -- 選中候選的完整注音
-  ["Control+Right"] = "pinyin",    -- 選中候選的漢語拼音
-  ["Alt+Left"]      = "english",   -- 選中候選的英文釋義（按住 Option 可先預覽）
-  ["Alt+Up"]        = "raw",       -- 所打鍵碼原樣轉注音符號（要單獨打出「ㄅ」就用這個）
+  ["Control+Left"]  = "pinyin",    -- 選中候選的漢語拼音
+  ["Control+Up"]    = "raw",       -- 所打鍵碼原樣轉注音符號（要單獨打出「ㄅ」就用這個）
+  ["Alt+Up"]        = "raw",       -- 同上，macOS 既有鍵位
 }
 
 function special_commit(key, env)
   local repr = key:repr()
   local mode = READING_KEYS[repr]
   local to_simplified = SIMPLIFIED_KEYS[repr]
+  local context = env.engine.context
+
+  -- 預覽開著時，單按 → 就輸出目前預覽的內容。
+  --
+  -- 這條路徑是為了 Windows：實測 Alt + 方向鍵完全到不了輸入法
+  -- （Windows 把 Alt 當選單鍵，Parallels 還會轉成 Win 鍵，而 Win+→ 是系統的視窗貼齊），
+  -- Shift 與 Control 配方向鍵則正常。改用「修飾鍵選模式、方向鍵輸出」就不依賴任何
+  -- Alt 組合鍵，兩個平台行為一致。
+  if not mode and not to_simplified and repr == "Right" and not key:release() then
+    for _, entry in ipairs(PREVIEW_OPTIONS) do
+      if context:get_option(entry.option) then
+        mode = entry.mode
+        break
+      end
+    end
+  end
+
   if not mode and not to_simplified then
     return 2
   end
 
-  local context = env.engine.context
   if not context:has_menu() then
     return 2
   end
@@ -696,6 +793,11 @@ function special_commit(key, env)
   end
   if reading then
     env.engine:commit_text(reading)
+    for _, entry in ipairs(PREVIEW_OPTIONS) do
+      if context:get_option(entry.option) then
+        context:set_option(entry.option, false)
+      end
+    end
     context:clear()
     return 1
   end
