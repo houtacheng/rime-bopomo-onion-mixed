@@ -438,6 +438,56 @@ local function pinyin_with_tone(syllable)
   return (base:gsub(target, PINYIN_TONE_MARKS[target][n], 1))
 end
 
+---------------------------------------------------------------------------
+-- 中文 → 英文釋義
+--
+-- english_gloss.txt 由 CC-CEDICT 產生，依 UTF-8 位元組排序。
+-- 11 萬筆做成 Lua table 會佔十幾 MB，所以改成對檔案做二分搜尋：
+-- 每次查詢約 17 次 seek，只在按住 Option 時才會用到。
+---------------------------------------------------------------------------
+local GLOSS_PATH = os.getenv("HOME") .. "/Library/Rime/english_gloss.txt"
+local gloss_handle, gloss_size
+
+local function gloss_file()
+  if gloss_handle == nil then
+    local fh = io.open(GLOSS_PATH, "rb")
+    if fh then
+      gloss_size = fh:seek("end")
+      gloss_handle = fh
+    else
+      gloss_handle, gloss_size = false, 0
+    end
+  end
+  return gloss_handle or nil
+end
+
+local function gloss_of(word)
+  local fh = gloss_file()
+  if not fh or not word or word == "" then return nil end
+  local lo, hi = 0, gloss_size
+  while lo < hi do
+    local mid = (lo + hi) // 2
+    fh:seek("set", mid)
+    if mid > 0 then fh:read("l") end      -- 丟掉被切半的那行
+    local line = fh:read("l")
+    if not line then hi = mid
+    else
+      local key = line:match("^([^\t]*)")
+      if key and key < word then lo = fh:seek() else hi = mid end
+    end
+  end
+  -- lo 一定落在行首。往後掃幾行確認（同一個詞不會佔超過幾行）
+  fh:seek("set", lo)
+  for _ = 1, 4 do
+    local line = fh:read("l")
+    if not line then return nil end
+    local key, text = line:match("^([^\t]+)\t(.+)$")
+    if key == word then return text end
+    if key and key > word then return nil end
+  end
+  return nil
+end
+
 -- 把候選文字轉成讀音字串。mode 為 "bopomofo" 或 "pinyin"；反查不到回傳 nil。
 local function reading_of(text, mode)
   local syllables = syllables_of(text)
@@ -457,6 +507,7 @@ end
 local PREVIEW_OPTIONS = {
   { option = "preview_bopomofo", mode = "bopomofo", open = "﹝", close = "﹞" },
   { option = "preview_pinyin",   mode = "pinyin",   open = "〔", close = "〕" },
+  { option = "preview_english",  mode = "english",  open = "〈", close = "〉" },
 }
 
 function simplified_hint(input, env)
@@ -469,7 +520,9 @@ function simplified_hint(input, env)
   for candidate in input:iter() do
     local comment = candidate.comment
     if preview then
-      local reading = reading_of(candidate.text, preview.mode)
+      local reading = (preview.mode == "english")
+        and gloss_of(candidate.text)
+        or reading_of(candidate.text, preview.mode)
       if reading then
         comment = preview.open .. reading .. preview.close
       end
@@ -495,6 +548,7 @@ end)()
 local PREVIEW_MODIFIERS = {
   Shift_L = "preview_bopomofo", Shift_R = "preview_bopomofo",
   Control_L = "preview_pinyin", Control_R = "preview_pinyin",
+  Alt_L = "preview_english",    Alt_R = "preview_english",
 }
 
 -- repr() 會把所有修飾鍵前綴串在鍵名前（key_event.cc 的 KeyEvent::repr），
@@ -581,7 +635,7 @@ end
 local READING_KEYS = {
   ["Shift+Right"]   = "bopomofo",  -- 選中候選的完整注音
   ["Control+Right"] = "pinyin",    -- 選中候選的漢語拼音
-  ["Alt+Left"]      = "pinyin",    -- 同上，不需改系統設定的後備鍵
+  ["Alt+Left"]      = "english",   -- 選中候選的英文釋義（按住 Option 可先預覽）
   ["Alt+Up"]        = "raw",       -- 所打鍵碼原樣轉注音符號（要單獨打出「ㄅ」就用這個）
 }
 
@@ -616,7 +670,15 @@ function special_commit(key, env)
     return 1
   end
 
-  local reading = reading_of(candidate.text, mode)
+  local reading
+  if mode == "english" then
+    -- 預覽可以顯示多個義項，上屏只取第一個，免得整串分號跟著出去
+    local gloss = gloss_of(candidate.text)
+    reading = gloss and gloss:match("^([^;]+)")
+    if reading then reading = reading:gsub("^%s+", ""):gsub("%s+$", "") end
+  else
+    reading = reading_of(candidate.text, mode)
+  end
   if reading then
     env.engine:commit_text(reading)
     context:clear()

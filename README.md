@@ -33,6 +33,7 @@ macOS 鼠鬚管（Squirrel）設定，以**洋蔥純注音**為基礎，加上�
 **讀音與字形輸出**
 - **按住 `Shift`**，候選右側的提示即時變成該候選的注音；放開恢復簡體提示。按 `Shift + →` 輸出
 - **按住 `Control`**，提示變成漢語拼音。按 `Control + →` 輸出
+- **按住 `Option`**，提示變成英文釋義（`銀行` → `bank`）。按 `Option + ←` 輸出
 - `Option + →` 輸出**簡體**
 - `Option + ↑` 把**所打的鍵碼**原樣轉成注音符號（單獨打出 `ㄅ` 用這個）
 
@@ -79,6 +80,7 @@ macOS 鼠鬚管（Squirrel）設定，以**洋蔥純注音**為基礎，加上�
 | `Shift + ←` | 左移一個注音 |
 | 按住 `Shift` | 提示顯示注音，`Shift + →` 輸出 |
 | 按住 `Control` | 提示顯示漢語拼音，`Control + →` 輸出 |
+| 按住 `Option` | 提示顯示英文釋義，`Option + ←` 輸出 |
 | `Option + →` | 輸出簡體 |
 | `Option + ↑` | 輸出所打鍵碼的注音符號 |
 | `Shift + 空白` | 中／英切換 |
@@ -117,6 +119,7 @@ git clone https://github.com/houtacheng/rime-appearance-editor.git && cd rime-ap
 | `default.custom.yaml` | 全域鍵位與方案清單 |
 | `squirrel.custom.yaml` | 外觀設定與配色 |
 | `essay-zh-hant-mc.txt` | 詞頻語料 |
+| `english_gloss.txt` | 中→英釋義表（CC-CEDICT 衍生） |
 
 ---
 
@@ -142,6 +145,9 @@ git clone https://github.com/houtacheng/rime-appearance-editor.git && cd rime-ap
 - 洋蔥純注音方案及相關補充資料保留原檔作者與來源註記。
 - `english_mixed.dict.yaml` 的詞表由 macOS `/usr/share/dict/web2` 本機產生。其系統 README 說明該詞表源自 Webster's Second International，原始著作權已失效。
 - `english_mixed.dict.yaml` 的權重與 `lua/english_common.lua` 的詞頻排名取自 [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords)（OpenSubtitles 2018 英文詞頻，MIT 授權）。前 5 萬名常用詞依詞頻對數映射到 1000–99000，其餘冷僻詞以 `64 - 詞長` 給 36–63。
+- `english_gloss.txt` 的中英釋義由 [CC-CEDICT](https://www.mdbg.net/chinese/dictionary?page=cc-cedict) 產生，
+  依 **[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)** 授權——與本儲存庫其餘內容的 3.0 不同，
+  因為 CC BY-SA 4.0 的內容不可降版為 3.0。只取前三個義項並截短至 70 字元，依 UTF-8 位元組排序以供二分搜尋。
 - `rime.lua` 及本儲存庫新增的整合設定以 CC BY-SA 3.0 方式分享。
 
 詳細授權條文見 [LICENSE.md](LICENSE.md)。
