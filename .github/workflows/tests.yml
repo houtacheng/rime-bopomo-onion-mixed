@@ -1,0 +1,16 @@
+# tests/ 不需要部署也不需要 librime：它以假的 API 載入 rime.lua，一支獨立的 Lua 就夠了。
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安裝 Lua
+        run: sudo apt-get update && sudo apt-get install -y lua5.4
+      - name: 語法檢查與測試
+        run: tests/run.sh

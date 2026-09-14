@@ -20,8 +20,13 @@ fi
 
 failed=0
 
-if command -v luac >/dev/null 2>&1; then
-  if luac -p ../rime.lua; then
+LUAC=""
+for candidate in luac luac5.4 luac5.3; do
+  if command -v "$candidate" >/dev/null 2>&1; then LUAC=$(command -v "$candidate"); break; fi
+done
+
+if [ -n "$LUAC" ]; then
+  if "$LUAC" -p ../rime.lua; then
     echo "語法檢查：rime.lua ✓"
   else
     echo "語法檢查：rime.lua ✗"

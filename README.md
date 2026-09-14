@@ -132,6 +132,7 @@ git clone https://github.com/houtacheng/rime-appearance-editor.git && cd rime-ap
 | `weasel.custom.yaml` | 外觀設定與配色（Windows） |
 | `essay-zh-hant-mc.txt` | 詞頻語料 |
 | `tests/` | 回歸測試，以假的 librime API 載入 `rime.lua`（`tests/run.sh`） |
+| `generate/` | 上面三個生成檔的產生器（詞表、詞頻排名、中英釋義） |
 | `english_gloss.txt` | 中→英釋義表（CC-CEDICT 衍生） |
 
 ---
