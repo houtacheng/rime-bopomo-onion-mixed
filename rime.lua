@@ -170,6 +170,15 @@ local FIXED_DAYS = { ["後天"] = 2, ["大後天"] = 3, ["前天"] = -2, ["大�
 -- 在日期格式中插入「原詞＋日期」的併排形式。
 -- 放在最常用的兩個純日期格式之後（第 3～5 位），加上原詞本身剛好佔滿第一頁六格。
 -- 代價是純 YYYYMMDD 被擠到第二頁；想換回來就調整這裡的插入位置。
+-- 時間版的併排形式，與日期同一套做法
+local function time_formats_with_word(word, timestamp)
+  local values = time_formats(timestamp)
+  local clock = os.date("%H:%M", timestamp)
+  table.insert(values, 3, word .. "（" .. clock .. "）")
+  table.insert(values, 4, word .. " " .. clock)
+  return values
+end
+
 local function date_formats_with_word(word, timestamp)
   local values = date_formats(timestamp)
   local d = os.date("*t", timestamp)
@@ -204,7 +213,7 @@ local function relative_time(text)
       local amount = sign * count * scale
       local now = os.time()
       if kind == "sec" then
-        return time_formats(now + amount), "〔時間〕"
+        return time_formats_with_word(text, now + amount), "〔時間〕"
       end
       local d = os.date("*t", now)
       if kind == "day" then
@@ -237,8 +246,7 @@ local function extras_for(text)
   if text == "昨天" then return date_formats_with_word(text, now - 86400), "〔日期〕" end
   if text == "明天" then return date_formats_with_word(text, now + 86400), "〔日期〕" end
   if text == "現在" then
-    return { os.date("%H:%M", now), os.date("%H:%M:%S", now),
-             os.date("%Y-%m-%d %H:%M:%S", now) }, "〔時間〕"
+    return time_formats_with_word(text, now), "〔時間〕"
   end
   if text == "時區" then
     return { os.date("%Z", now), "UTC" .. os.date("%z", now) }, "〔時間〕"
