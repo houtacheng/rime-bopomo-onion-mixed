@@ -75,40 +75,155 @@ local function date_formats(timestamp)
   return result
 end
 
+---------------------------------------------------------------------------
+-- 相對時間：一小時後、十分鐘前、後天、三個月後…
+---------------------------------------------------------------------------
+local UTF8_CHAR = (utf8 and utf8.charpattern) or "[\0-\127\194-\244][\128-\191]*"
+
+local CN_DIGIT = { ["零"]=0, ["〇"]=0, ["一"]=1, ["二"]=2, ["兩"]=2, ["三"]=3,
+                   ["四"]=4, ["五"]=5, ["六"]=6, ["七"]=7, ["八"]=8, ["九"]=9 }
+local CN_UNIT = { ["十"]=10, ["百"]=100 }
+
+-- 支援阿拉伯數字與中文數字（十、十五、二十五、一百二十）。
+-- 空字串視為 1，所以「小時後」等同「一小時後」。
+local function chinese_to_number(text)
+  if text == "" then return 1 end
+  if text == "半" then return 0.5 end
+  local n = tonumber(text)
+  if n then return n end
+  local total, section, seen = 0, 0, false
+  for ch in text:gmatch(UTF8_CHAR) do
+    local digit, unit = CN_DIGIT[ch], CN_UNIT[ch]
+    if digit then
+      section = digit; seen = true
+    elseif unit then
+      if section == 0 then section = 1 end   -- 「十五」開頭的十
+      total = total + section * unit; section = 0; seen = true
+    else
+      return nil                              -- 出現非數字字元就不是相對時間
+    end
+  end
+  if not seen then return nil end
+  return total + section
+end
+
+local REL_DIRECTIONS = { {"之後", 1}, {"以後", 1}, {"後", 1},
+                         {"之前", -1}, {"以前", -1}, {"前", -1} }
+
+-- kind：sec 用秒數加減，其餘交給 os.time 做日曆進位（跨月跨年才會正確）
+local REL_UNITS = {
+  {"個小時","sec",3600}, {"小時","sec",3600}, {"鐘頭","sec",3600}, {"時","sec",3600},
+  {"分鐘","sec",60}, {"分","sec",60},
+  {"秒鐘","sec",1}, {"秒","sec",1},
+  {"個星期","day",7}, {"個禮拜","day",7}, {"星期","day",7}, {"禮拜","day",7}, {"週","day",7},
+  {"天","day",1}, {"日","day",1},
+  {"個月","month",1}, {"月","month",1},
+  {"年","year",1},
+}
+
+-- 一律以位元組長度由長到短比對，否則「分鐘」會先被「分」吃掉、「個月」被「月」吃掉
+table.sort(REL_DIRECTIONS, function(a, b) return #a[1] > #b[1] end)
+table.sort(REL_UNITS, function(a, b) return #a[1] > #b[1] end)
+
+local function time_formats(timestamp)
+  local d = os.date("*t", timestamp)
+  local today = os.date("*t")
+  local same_day = d.year == today.year and d.month == today.month and d.day == today.day
+  local out = { os.date("%H:%M", timestamp), os.date("%H:%M:%S", timestamp) }
+  if same_day then
+    table.insert(out, string.format("%d 時 %d 分", d.hour, d.min))
+  else
+    -- 跨日了，只給時分會看不出是哪天
+    table.insert(out, os.date("%Y-%m-%d %H:%M", timestamp))
+    table.insert(out, string.format("%d 月 %d 日 %d 時 %d 分", d.month, d.day, d.hour, d.min))
+  end
+  table.insert(out, os.date("%Y-%m-%d %H:%M:%S", timestamp))
+  return out
+end
+
+-- 某月有幾天：下個月的第 0 日就是這個月的最後一日，os.time 會自行正規化
+local function days_in_month(year, month)
+  return os.date("*t", os.time({ year = year, month = month + 1, day = 0, hour = 12 })).day
+end
+
+local FIXED_DAYS = { ["後天"] = 2, ["大後天"] = 3, ["前天"] = -2, ["大前天"] = -3 }
+
+local function relative_time(text)
+  local days = FIXED_DAYS[text]
+  if days then return date_formats(os.time() + days * 86400), "〔日期〕" end
+
+  local sign, rest
+  for _, entry in ipairs(REL_DIRECTIONS) do
+    local suffix = entry[1]
+    if #text > #suffix and text:sub(-#suffix) == suffix then
+      sign, rest = entry[2], text:sub(1, #text - #suffix)
+      break
+    end
+  end
+  if not sign then return nil end
+
+  for _, entry in ipairs(REL_UNITS) do
+    local unit, kind, scale = entry[1], entry[2], entry[3]
+    if #rest >= #unit and rest:sub(-#unit) == unit then
+      local count = chinese_to_number(rest:sub(1, #rest - #unit))
+      if not count then return nil end
+      local amount = sign * count * scale
+      local now = os.time()
+      if kind == "sec" then
+        return time_formats(now + amount), "〔時間〕"
+      end
+      local d = os.date("*t", now)
+      if kind == "day" then
+        d.day = d.day + amount                -- 天數交給 os.time 正規化即可
+      else
+        if kind == "month" then
+          local total = d.year * 12 + (d.month - 1) + amount
+          d.year = math.floor(total / 12)
+          d.month = total % 12 + 1
+        else
+          d.year = d.year + amount
+        end
+        -- 月底要截斷，不能讓它溢出。1/31 加一個月，os.time 會算成 3/3，
+        -- 但一般人期望的是 2/28。
+        d.day = math.min(d.day, days_in_month(d.year, d.month))
+      end
+      return date_formats(os.time(d)), "〔日期〕"
+    end
+  end
+  return nil
+end
+
 local function extras_for(text)
   local now = os.time()
   local d = os.date("*t", now)
   if text == "今年" then return year_formats(d.year) end
   if text == "去年" then return year_formats(d.year - 1) end
   if text == "明年" then return year_formats(d.year + 1) end
-  if text == "今天" then return date_formats(now) end
-  if text == "昨天" then return date_formats(now - 86400) end
-  if text == "明天" then return date_formats(now + 86400) end
+  if text == "今天" then return date_formats(now), "〔日期〕" end
+  if text == "昨天" then return date_formats(now - 86400), "〔日期〕" end
+  if text == "明天" then return date_formats(now + 86400), "〔日期〕" end
   if text == "現在" then
-    return { os.date("%H:%M", now), os.date("%H:%M:%S", now), os.date("%Y-%m-%d %H:%M:%S", now) }
+    return { os.date("%H:%M", now), os.date("%H:%M:%S", now),
+             os.date("%Y-%m-%d %H:%M:%S", now) }, "〔時間〕"
   end
   if text == "時區" then
-    return { os.date("%Z", now), "UTC" .. os.date("%z", now) }
+    return { os.date("%Z", now), "UTC" .. os.date("%z", now) }, "〔時間〕"
   end
+  local relative, label = relative_time(text)
+  if relative then return relative, label end
   return symbols[text]
 end
 
 function date_symbol_extras(input, env)
   local expanded = {}
   for candidate in input:iter() do
-    local values = extras_for(candidate.text)
+    local values, label = extras_for(candidate.text)
     if values and not expanded[candidate.text] then
       expanded[candidate.text] = true
-      if date_triggers[candidate.text] then
-        yield(candidate)
-        for _, value in ipairs(values) do
-          yield(Candidate("date_symbol", candidate.start, candidate._end, value, "〔日期〕"))
-        end
-      else
-        yield(candidate)
-        for _, value in ipairs(values) do
-          yield(Candidate("date_symbol", candidate.start, candidate._end, value, "〔日期／符號〕"))
-        end
+      label = label or (date_triggers[candidate.text] and "〔日期〕" or "〔日期／符號〕")
+      yield(candidate)
+      for _, value in ipairs(values) do
+        yield(Candidate("date_symbol", candidate.start, candidate._end, value, label))
       end
     else
       yield(candidate)
