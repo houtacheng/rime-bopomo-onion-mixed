@@ -13,7 +13,8 @@ python3 ~/Library/Rime/tools/rime-appearance/server.py
 - **讀取目前外觀** —— 啟動時直接從 `squirrel.custom.yaml` 讀取現值
 - **字型** —— 列出本機 1500+ 個字型，顯示**可讀名稱**（標楷體、蘋方-繁 細體），
   清單中每個項目都用它自己的字型渲染；中文名、英文名、PostScript 名稱都能搜
-- **配色** —— 列出 `squirrel.custom.yaml` 與鼠鬚管內建的所有配色；也可以用色票新增自己的配色
+- **配色** —— 列出 `squirrel.custom.yaml` 與鼠鬚管內建的所有配色；也可以新增自己的配色，
+  每個顏色都能單獨調透明度，編輯時預覽即時反映草稿
 - **即時預覽** —— 右側模擬候選窗，顏色、字型、圓角、間距、透明度都會跟著變
 - **套用並部署** —— 寫回設定檔後自動部署，並**確認真的生效**
 - **快照還原** —— 每次套用前自動建立快照，隨時可以退回
@@ -22,6 +23,11 @@ python3 ~/Library/Rime/tools/rime-appearance/server.py
 
 **色值是 BGR 不是 RGB。** Rime 的 `0xBBGGRR` 與 `0xAABBGGRR` 都是反過來的，
 新增配色時要換算，別直接把 CSS 的 `#RRGGBB` 填進去。
+
+**透明度用八位色值。** 鼠鬚管的 `SquirrelConfig.swift` 有兩條解析規則：八位是
+`0xAABBGGRR`、六位是 `0xBBGGRR`（alpha 視為 255）。本工具在不透明時寫六位、
+有透明度時才寫八位，保持檔案好讀。這與 `style/alpha` 不同——後者是整個候選窗的
+不透明度，前者可以讓個別顏色（例如只有背景）半透明。
 
 **字型有兩個名稱，別搞混。** `system_profiler` 回傳的 `_name` 是 PostScript 名稱
 （`DFKaiShu-SB-Estd-BF`），`fullname`／`family` 才是可讀名稱（`標楷體`）。

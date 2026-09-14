@@ -228,11 +228,19 @@ def add_scheme(name, colors):
         raise ValueError("配色「%s」已存在" % name)
 
     def to_rime(css):
-        m = re.match(r"rgba?\((\d+),\s*(\d+),\s*(\d+)", css or "")
+        """CSS rgba() → Rime 色值。
+
+        Rime 是 BGR 順序：不透明寫 0xBBGGRR，帶透明度寫 0xAABBGGRR。
+        鼠鬚管兩種長度都吃（SquirrelConfig.swift 的 color(from:) 有兩條規則）。
+        """
+        m = re.match(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)", css or "")
         if not m:
             return "0x000000"
-        r, g, b = (int(x) for x in m.groups())
-        return "0x%02x%02x%02x" % (b, g, r)   # BGR
+        r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        a = float(m.group(4)) if m.group(4) is not None else 1.0
+        if a >= 0.999:
+            return "0x%02x%02x%02x" % (b, g, r)
+        return "0x%02x%02x%02x%02x" % (round(a * 255), b, g, r)
 
     block = ["", "  preset_color_schemes/%s:" % name,
              '    name: "%s"' % name,
