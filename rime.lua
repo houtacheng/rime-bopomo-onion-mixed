@@ -243,6 +243,20 @@ local function relative_time(text)
       local count = chinese_to_number(rest:sub(1, #rest - #unit))
       if not count then return nil end
       local amount = sign * count * scale
+      -- 數量可以是小數（半天、半個月、1.5 年）。os.time 與 os.date 的欄位必須是整數，
+      -- 給小數會直接報錯（field 'day' is not an integer），連帶讓整個濾鏡中斷、候選消失。
+      -- 所以先往更細的單位換算，換到整數為止：年→月→天→秒。
+      -- 因此半年是六個月、半個月是十五天、半天是十二小時（結果變成時刻而不是日期）。
+      if kind == "year" and amount % 1 ~= 0 then
+        amount, kind = amount * 12, "month"
+      end
+      if kind == "month" and amount % 1 ~= 0 then
+        amount, kind = amount * 30, "day"
+      end
+      if kind == "day" and amount % 1 ~= 0 then
+        amount, kind = amount * 86400, "sec"
+      end
+      amount = math.floor(amount)
       local now = os.time()
       if kind == "sec" then
         return time_formats_with_word(text, now + amount), "〔時間〕"
@@ -770,12 +784,19 @@ function simplified_hint(input, env)
   end
 end
 
--- 按住 Shift 看注音、按住 Control 看漢語拼音。放開就恢復簡體提示。
+-- 按一下 Shift 看注音、Control 看漢語拼音、Option 看英文釋義；再按一次關閉。
 
 local PREVIEW_MODIFIERS = {
   Shift_L = "preview_bopomofo", Shift_R = "preview_bopomofo",
   Control_L = "preview_pinyin", Control_R = "preview_pinyin",
   Alt_L = "preview_english",    Alt_R = "preview_english",
+}
+
+-- 某個按鍵事件身上是否還帶著開啟預覽的那個修飾位。用來認出「這是組合鍵」。
+local PREVIEW_MODIFIER_HELD = {
+  preview_bopomofo = function(key) return key:shift() end,
+  preview_pinyin   = function(key) return key:ctrl() end,
+  preview_english  = function(key) return key:alt() end,
 }
 
 -- repr() 會把所有修飾鍵前綴串在鍵名前（key_event.cc 的 KeyEvent::repr），
@@ -784,6 +805,65 @@ local PREVIEW_MODIFIERS = {
 local function bare_key_name(key)
   local repr = key:repr()
   return repr:match("([^+]+)$") or repr
+end
+
+-- set_option 會讓 librime 重跑 RefreshNonConfirmedComposition（engine.cc 的
+-- OnOptionUpdate），而那會把高亮歸零。先記下再還原。
+local function keep_highlight(context, apply)
+  local index = 0
+  pcall(function()
+    local composition = context.composition
+    if composition and not composition:empty() then
+      index = composition:back().selected_index or 0
+    end
+  end)
+  apply()
+  if index > 0 and context:has_menu() then
+    pcall(function() context:highlight(index) end)
+  end
+end
+
+-- 修飾鍵同時是選字鍵的前半段：本方案的選字、翻頁、移位全綁在 Shift+字母／Shift+方向鍵上
+-- （Shift+Q、Shift+K、Shift+←…），而按組合鍵時作業系統一定會先送一個單獨的修飾鍵事件，
+-- 於是每次選字都順手把預覽切換了一次——提示會忽然從簡體變成注音，而且若停在「開」，
+-- 接下來按 → 就不是翻頁，而是把注音文上屏。
+--
+-- 作法：切換時先記下原本的狀態，下一個按鍵若是非修飾鍵、身上卻還帶著同一個修飾位，
+-- 就代表剛才那下是組合鍵的前半段，把狀態原樣還原。
+-- 兩個平台都成立——不依賴放開事件何時抵達（小狼毫是按下與放開同時送達）。
+local pending_preview = nil   -- { option = 剛切換的選項, state = 切換前的三個選項狀態 }
+
+local function preview_state(context)
+  local state = {}
+  for _, entry in ipairs(PREVIEW_OPTIONS) do
+    state[entry.option] = context:get_option(entry.option)
+  end
+  return state
+end
+
+local function toggle_preview(context, option, on)
+  pending_preview = { option = option, state = preview_state(context) }
+  keep_highlight(context, function()
+    -- 切換模式時先關掉別的，免得兩個同時開著
+    for _, entry in ipairs(PREVIEW_OPTIONS) do
+      if entry.option ~= option and context:get_option(entry.option) then
+        context:set_option(entry.option, false)
+      end
+    end
+    context:set_option(option, on)
+  end)
+end
+
+local function undo_preview(context)
+  local state = pending_preview.state
+  pending_preview = nil
+  keep_highlight(context, function()
+    for option, value in pairs(state) do
+      if context:get_option(option) ~= value then
+        context:set_option(option, value)
+      end
+    end
+  end)
 end
 
 function reading_preview(key, env)
@@ -807,11 +887,26 @@ function reading_preview(key, env)
   local context = env.engine.context
   local option = PREVIEW_MODIFIERS[name]
 
-  -- 修飾鍵：按下時開啟預覽。
+  -- 剛才那下修飾鍵其實是組合鍵的前半段？把它還原（見上方說明）。
+  -- 修飾鍵自己的事件（含放開）不算，否則小狼毫立刻送達的放開就會把待判狀態吃掉。
+  if pending_preview and not option then
+    local undone = PREVIEW_MODIFIER_HELD[pending_preview.option](key)
+    if undone then undo_preview(context) else pending_preview = nil end
+    if DEBUG_KEYS then
+      local fh = io.open(DEBUG_KEYS, "a")
+      if fh then
+        fh:write(string.format("%s   [proc] %s（%s）\n", os.date("%H:%M:%S"),
+          undone and "還原：剛才是組合鍵" or "確認：剛才是單獨按修飾鍵", name))
+        fh:close()
+      end
+    end
+  end
+
+  -- 修飾鍵：按下時切換預覽。
   --
   -- 不能用「放開就關掉」。Windows 的小狼毫不管按多久，按下與放開都在同一瞬間送達
   -- （實測時間戳完全相同），那樣預覽會開了又立刻關掉，只看得到一閃。
-  -- 改成由下一個非修飾鍵關閉，兩個平台行為一致。
+  -- 改成按一下切換、再按一次關閉，兩個平台行為一致。
   -- 沒在組字時清掉殘留的預覽狀態，否則上次留下的模式會跟到下一次輸入
   if not context:is_composing() then
     for _, entry in ipairs(PREVIEW_OPTIONS) do
@@ -824,41 +919,19 @@ function reading_preview(key, env)
   if option then
     if key:release() then return 2 end
     -- 再按一次同一個修飾鍵就關掉，不必等別的鍵
-    if context:get_option(option) then
-      context:set_option(option, false)
-      return context:has_menu() and 1 or 2
-    end
-
-    local index = 0
-    pcall(function()
-      local composition = context.composition
-      if composition and not composition:empty() then
-        index = composition:back().selected_index or 0
-      end
-    end)
-    -- 切換模式時先關掉別的，免得兩個同時開著
-    for _, entry in ipairs(PREVIEW_OPTIONS) do
-      if entry.option ~= option and context:get_option(entry.option) then
-        context:set_option(entry.option, false)
-      end
-    end
-    -- set_option 會讓 librime 重跑 RefreshNonConfirmedComposition（engine.cc 的
-    -- OnOptionUpdate），而那會把高亮歸零。先記下再還原。
-    context:set_option(option, true)
-    if index > 0 and context:has_menu() then
-      pcall(function() context:highlight(index) end)
-    end
+    local on = not context:get_option(option)
+    toggle_preview(context, option, on)
     if DEBUG_KEYS then
       local fh = io.open(DEBUG_KEYS, "a")
       if fh then
-        fh:write(string.format("%s   [proc] 開啟 %s  讀回=%s  has_menu=%s  highlight=%d\n",
-          os.date("%H:%M:%S"), option, tostring(context:get_option(option)),
-          tostring(context:has_menu()), index))
+        fh:write(string.format("%s   [proc] %s %s  讀回=%s  has_menu=%s\n",
+          os.date("%H:%M:%S"), on and "開啟" or "關閉", option,
+          tostring(context:get_option(option)), tostring(context:has_menu())))
         fh:close()
       end
     end
-    -- 有候選列時吃掉這個按鍵，組字中應用程式本來就收不到，
-    -- 也不影響 Shift+字母 那組選字鍵（那是不同的事件）。
+    -- 有候選列時吃掉這個按鍵，組字中應用程式本來就收不到。
+    -- Shift+字母 那組選字鍵是另一個事件，會走上面的還原路徑。
     return context:has_menu() and 1 or 2
   end
 
