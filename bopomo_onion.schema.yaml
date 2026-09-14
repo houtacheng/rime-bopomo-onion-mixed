@@ -65,7 +65,7 @@ engine:
   translators:
     - lua_translator@number_formats
     - punct_translator
-    # - table_translator@custom_phrase
+    - table_translator@custom_phrase
     - table_translator@english
     - script_translator
 ################################### 濾鏡 ######################################
@@ -156,13 +156,16 @@ english:
   enable_user_dict: true
   initial_quality: 0 #原為 1，等於讓英文無條件多拿 +1 底分而壓過中文；改 0 後一般情況中文自然在前，lua_filter@chinese_first 則是保證。
 ############################## 以下為短語 ##########################################
-# custom_phrase:
-#   dictionary: ""
-#   user_dict: bopomo_onion_phrase
-#   db_class: stabledb
-#   enable_completion: false
-#   enable_sentence: false
-#   initial_quality: 1
+# 自訂短語：編碼 → 文字，碼表在 bopomo_onion_phrase.txt（不進版控）。
+# 與 lua 的 symbols 不同——symbols 比對「候選文字」，這個比對「打下去的鍵」，
+# 所以像 873、14f 這種打不出中文候選的編碼只能用這個。
+custom_phrase:
+  dictionary: ""
+  user_dict: bopomo_onion_phrase
+  db_class: stabledb
+  enable_completion: false
+  enable_sentence: false
+  initial_quality: 100   # 自訂短語是刻意設的，應該排在一般候選之前
 ################################### 符號處理 ####################################
 punctuator:
   import_preset: bopomo_onion_symbols

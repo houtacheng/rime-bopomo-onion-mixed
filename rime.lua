@@ -79,6 +79,19 @@ local symbols = {
   ["美分"] = { "¢" }, ["貨幣"] = { "¤" },
 }
 
+-- 個人詞條：從 lua/personal_phrases.lua 併入 symbols。
+-- 那個檔案不進版控，所以電話、住址這類東西留在本機，設定本身仍可公開分享。
+-- 檔案不存在就跳過，不影響其他功能。
+do
+  for _, mod in ipairs({ "personal_phrases", "lua.personal_phrases" }) do
+    local ok, personal = pcall(require, mod)
+    if ok and type(personal) == "table" then
+      for word, values in pairs(personal) do symbols[word] = values end
+      break
+    end
+  end
+end
+
 local function ganzhi(year)
   return stems[((year - 4) % 10) + 1] .. branches[((year - 4) % 12) + 1] .. "年"
 end

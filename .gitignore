@@ -10,6 +10,7 @@ installation.yaml
 
 # Personal phrases and local backups
 bopomo_onion_phrase.txt
+lua/personal_phrases.lua
 *.backup
 *.bak
 
