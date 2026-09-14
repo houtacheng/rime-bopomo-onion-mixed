@@ -218,6 +218,71 @@ def read_schemes():
     return sorted(merged.values(), key=lambda s: (s["source"] != "自訂", s["id"]))
 
 
+def _to_rime_color(css):
+    """CSS rgba() → Rime 色值。
+
+    Rime 是 BGR 順序：不透明寫 0xBBGGRR，帶透明度寫 0xAABBGGRR。
+    鼠鬚管兩種長度都吃（SquirrelConfig.swift 的 color(from:) 有兩條規則）。
+    """
+    m = re.match(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)", css or "")
+    if not m:
+        return "0x000000"
+    r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    a = float(m.group(4)) if m.group(4) is not None else 1.0
+    if a >= 0.999:
+        return "0x%02x%02x%02x" % (b, g, r)
+    return "0x%02x%02x%02x%02x" % (round(a * 255), b, g, r)
+
+
+def _find_block(lines, name):
+    """回傳 (起始行, 結束行, 縮排)；找不到回傳 None。"""
+    header = re.compile(r"^(\s*)preset_color_schemes/%s:\s*$" % re.escape(name))
+    for i, line in enumerate(lines):
+        m = header.match(line)
+        if not m:
+            continue
+        indent = len(m.group(1))
+        j = i + 1
+        while j < len(lines):
+            nxt = lines[j]
+            if nxt.strip() and (len(nxt) - len(nxt.lstrip())) <= indent:
+                break
+            j += 1
+        return i, j, indent
+    return None
+
+
+def update_scheme(name, colors):
+    """就地改寫既有配色的色值，保留其他設定與註解。"""
+    with open(CUSTOM, encoding="utf-8") as fh:
+        lines = fh.read().split("\n")
+    found = _find_block(lines, name)
+    if not found:
+        raise ValueError("找不到配色「%s」" % name)
+    start, end, indent = found
+    pad = " " * (indent + 2)
+    remaining = dict(colors)
+    for i in range(start + 1, end):
+        m = re.match(r"^(\s*)([a-z_]+)(\s*):\s*(.*)$", lines[i])
+        if not m or lines[i].lstrip().startswith("#"):
+            continue
+        key = m.group(2)
+        if key not in remaining:
+            continue
+        rest = m.group(4)
+        stripped = _strip_comment(rest)
+        comment = rest.rstrip()[len(stripped):]
+        comment = " " + comment.lstrip() if comment.strip() else ""
+        lines[i] = "%s%s%s: %s%s" % (m.group(1), key, m.group(3),
+                                     _to_rime_color(remaining.pop(key)), comment)
+    extra = ["%s%s: %s" % (pad, k, _to_rime_color(remaining[k]))
+             for k in COLOR_KEYS if k in remaining]
+    if extra:
+        lines[end:end] = extra
+    with open(CUSTOM, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+
+
 def add_scheme(name, colors):
     """把新配色寫進 squirrel.custom.yaml 的 preset_color_schemes 區。"""
     if not re.match(r"^[A-Za-z_][A-Za-z_0-9]*$", name):
@@ -227,27 +292,12 @@ def add_scheme(name, colors):
     if re.search(r"^\s*preset_color_schemes/%s:\s*$" % re.escape(name), text, re.M):
         raise ValueError("配色「%s」已存在" % name)
 
-    def to_rime(css):
-        """CSS rgba() → Rime 色值。
-
-        Rime 是 BGR 順序：不透明寫 0xBBGGRR，帶透明度寫 0xAABBGGRR。
-        鼠鬚管兩種長度都吃（SquirrelConfig.swift 的 color(from:) 有兩條規則）。
-        """
-        m = re.match(r"rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)", css or "")
-        if not m:
-            return "0x000000"
-        r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        a = float(m.group(4)) if m.group(4) is not None else 1.0
-        if a >= 0.999:
-            return "0x%02x%02x%02x" % (b, g, r)
-        return "0x%02x%02x%02x%02x" % (round(a * 255), b, g, r)
-
     block = ["", "  preset_color_schemes/%s:" % name,
              '    name: "%s"' % name,
              '    author: "rime-appearance"']
     for key in COLOR_KEYS:
         if key in colors:
-            block.append("    %s: %s" % (key, to_rime(colors[key])))
+            block.append("    %s: %s" % (key, _to_rime_color(colors[key])))
     anchor = re.search(r"^\s*preset_color_schemes/", text, re.M)
     pos = anchor.start() if anchor else len(text)
     text = text[:pos] + "\n".join(block) + "\n\n" + text[pos:]
@@ -430,9 +480,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 result["settings"] = read_settings()
                 return self._json(result)
             if self.path == "/api/scheme":
-                take_snapshot("新增配色前自動備份")
-                add_scheme(payload["name"], payload.get("colors", {}))
-                return self._json({"ok": True, "message": "配色已新增",
+                name = payload["name"]
+                colors = payload.get("colors", {})
+                exists = _find_block(open(CUSTOM, encoding="utf-8").read().split("\n"),
+                                     name) is not None
+                if payload.get("overwrite"):
+                    take_snapshot("覆蓋配色 %s 前自動備份" % name)
+                    if exists:
+                        update_scheme(name, colors)
+                        msg = "已覆蓋配色「%s」" % name
+                    else:
+                        # 內建配色在 Squirrel.app 內唯讀，改用同名區塊蓋過它
+                        add_scheme(name, colors)
+                        msg = ("內建配色無法直接修改，已在 squirrel.custom.yaml "
+                               "建立同名的「%s」覆蓋它" % name)
+                else:
+                    take_snapshot("新增配色 %s 前自動備份" % name)
+                    add_scheme(name, colors)
+                    msg = "已新增配色「%s」" % name
+                return self._json({"ok": True, "message": msg,
                                    "schemes": read_schemes(),
                                    "snapshots": list_snapshots()})
         except (ValueError, KeyError, OSError) as exc:

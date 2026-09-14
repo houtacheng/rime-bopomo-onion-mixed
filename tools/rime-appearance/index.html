@@ -106,16 +106,19 @@
       <div class="row" style="margin-top:12px"><label>暗色主題</label><select id="color_scheme_dark"></select></div>
       <div class="swatches" id="sw_dark"></div>
       <div class="actions" style="margin-top:14px">
-        <button class="small" id="btn_newscheme">新增配色…</button>
+        <button class="small" id="btn_editscheme">編輯這個配色…</button>
+        <button class="small" id="btn_newscheme">從頭新增…</button>
         <span class="note" id="scheme_count"></span>
       </div>
       <div id="newscheme" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
         <div class="row"><label>名稱</label><input type="text" id="ns_name" placeholder="my_scheme"></div>
         <div class="grid2" id="ns_colors"></div>
         <div class="actions" style="margin-top:12px">
-          <button class="primary small" id="ns_save">建立</button>
+          <button class="primary small" id="ns_save">另存新檔</button>
+          <button class="small" id="ns_overwrite">覆蓋原配色</button>
           <button class="small" id="ns_cancel">取消</button>
         </div>
+        <p class="note" id="ns_hint"></p>
       </div>
     </div>
 
@@ -252,6 +255,35 @@ function buildSchemeSelects(){
   $('#scheme_count').textContent = `共 ${STATE.schemes.length} 個配色`;
 }
 
+let EDITING = null;   // 正在編輯哪個既有配色；null 表示從頭新增
+
+function rgbaParts(css){
+  const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(css||'');
+  if(!m) return null;
+  const hex = '#' + [1,2,3].map(i => (+m[i]).toString(16).padStart(2,'0')).join('');
+  return { hex, alpha: m[4]!==undefined ? parseFloat(m[4]) : 1 };
+}
+
+// 把既有配色載入編輯面板。缺的色鍵維持預設，不要憑空補值。
+function loadSchemeIntoEditor(id){
+  const cs = (SCHEMES[id] && SCHEMES[id].colors) || {};
+  PREVIEW_COLORS.forEach(([k,,def]) => {
+    const parts = rgbaParts(cs[k]) || { hex: def, alpha: 1 };
+    const sw = $(`#ns_colors input[type=color][data-k="${k}"]`);
+    const al = $(`#ns_colors .alpha[data-k="${k}"]`);
+    if(sw) sw.value = parts.hex;
+    if(al){ al.value = Math.round(parts.alpha*100);
+            $(`#ns_colors .pct[data-k="${k}"]`).textContent = al.value + '%'; }
+  });
+  EDITING = id;
+  $('#ns_name').value = id;
+  $('#ns_overwrite').disabled = false;
+  const builtin = SCHEMES[id] && SCHEMES[id].source === '內建';
+  $('#ns_hint').textContent = builtin
+    ? `「${id}」是鼠鬚管內建配色，檔案在 Squirrel.app 內無法修改。按「覆蓋原配色」會在 squirrel.custom.yaml 建立同名區塊蓋過它，效果相同且可還原。`
+    : `按「覆蓋原配色」會就地改寫 ${id} 的色值，其他設定與註解保留。`;
+}
+
 function buildNewSchemeColors(){
   // 鼠鬚管的色值可以帶透明度（0xAABBGGRR），所以每個顏色都給一條 alpha 滑桿
   $('#ns_colors').innerHTML = PREVIEW_COLORS.map(([k,label,def]) =>
@@ -352,15 +384,25 @@ function bindControls(){
     buildFontPickers(); syncFromSettings();
     ev.target.disabled = false; ev.target.textContent = '重新掃描系統字型';
   });
-  $('#btn_newscheme').addEventListener('click', () => {
-    const box = $('#newscheme');
-    box.style.display = box.style.display === 'block' ? 'none' : 'block';
+  $('#btn_editscheme').addEventListener('click', () => {
+    $('#newscheme').style.display = 'block';
+    loadSchemeIntoEditor(SETTINGS.color_scheme);
     render();
   });
+  $('#btn_newscheme').addEventListener('click', () => {
+    $('#newscheme').style.display = 'block';
+    EDITING = null;
+    buildNewSchemeColors();
+    $('#ns_name').value = '';
+    $('#ns_overwrite').disabled = true;
+    $('#ns_hint').textContent = '從預設值開始建立一個新配色。';
+    render();
+  });
+  $('#ns_overwrite').addEventListener('click', () => saveScheme(true));
   $('#ns_cancel').addEventListener('click', () => {
     $('#newscheme').style.display = 'none'; render();
   });
-  $('#ns_save').addEventListener('click', saveScheme);
+  $('#ns_save').addEventListener('click', () => saveScheme(false));
 }
 
 function syncFromSettings(){
@@ -477,11 +519,14 @@ async function rollback(id){
   if(d.snapshots){ STATE.snapshots = d.snapshots; renderSnapshots(); }
 }
 
-async function saveScheme(){
+async function saveScheme(overwrite){
   const name = $('#ns_name').value.trim();
+  if(!name){ say('err','請先填配色名稱'); return; }
+  if(overwrite && !confirm(`確定要覆蓋配色「${name}」嗎？\n（會先自動建立快照，可以還原）`)) return;
   const cols = draftColors();
   const r = await fetch('/api/scheme', {method:'POST',
-    headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, colors: cols})});
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({name, colors: cols, overwrite: !!overwrite})});
   const d = await r.json();
   say(d.ok?'ok':'err', d.message);
   if(d.ok){

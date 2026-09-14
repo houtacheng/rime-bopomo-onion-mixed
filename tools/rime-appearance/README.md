@@ -13,8 +13,8 @@ python3 ~/Library/Rime/tools/rime-appearance/server.py
 - **讀取目前外觀** —— 啟動時直接從 `squirrel.custom.yaml` 讀取現值
 - **字型** —— 列出本機 1500+ 個字型，顯示**可讀名稱**（標楷體、蘋方-繁 細體），
   清單中每個項目都用它自己的字型渲染；中文名、英文名、PostScript 名稱都能搜
-- **配色** —— 列出 `squirrel.custom.yaml` 與鼠鬚管內建的所有配色；也可以新增自己的配色，
-  每個顏色都能單獨調透明度，編輯時預覽即時反映草稿
+- **配色** —— 列出 `squirrel.custom.yaml` 與鼠鬚管內建的所有配色。可以載入任一個配色修改，
+  再選擇**覆蓋原配色**或**另存新檔**；每個顏色都能單獨調透明度，編輯時預覽即時反映草稿
 - **即時預覽** —— 右側模擬候選窗，顏色、字型、圓角、間距、透明度都會跟著變
 - **套用並部署** —— 寫回設定檔後自動部署，並**確認真的生效**
 - **快照還原** —— 每次套用前自動建立快照，隨時可以退回
@@ -32,6 +32,10 @@ python3 ~/Library/Rime/tools/rime-appearance/server.py
 **字型有兩個名稱，別搞混。** `system_profiler` 回傳的 `_name` 是 PostScript 名稱
 （`DFKaiShu-SB-Estd-BF`），`fullname`／`family` 才是可讀名稱（`標楷體`）。
 介面顯示可讀名稱，但寫進 `font_face` 的必須是 PostScript 名稱。
+
+**內建配色不能真的覆蓋。** 它們在 `Squirrel.app` 內部，唯讀。按「覆蓋原配色」時，
+本工具改為在 `squirrel.custom.yaml` 建立同名區塊——Rime 的合併順序會讓它蓋過內建版，
+效果相同，而且刪掉就能還原。既有的自訂配色則是就地改寫色值，其他設定與註解保留。
 
 **`color_scheme:` 要填區塊名稱，不是顯示名稱。** 例如 `preset_color_schemes/mac_lamb`
 區塊裡寫著 `name: "lamb"`，但設定要填的是 `mac_lamb`。
