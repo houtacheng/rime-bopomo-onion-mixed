@@ -299,39 +299,6 @@ function number_formats(input, segment, env)
   end
 end
 
-function simplified_hint(input, env)
-  for candidate in input:iter() do
-    local simplified = tw_to_s:convert(candidate.text)
-    local comment = candidate.comment
-    if simplified ~= candidate.text then
-      comment = "〔" .. simplified .. "〕"
-    end
-    yield(ShadowCandidate(candidate, candidate.type, candidate.text, comment))
-  end
-end
-
--- 注意：Squirrel 0.18 的 SquirrelInputController.m 在 NSEventTypeKeyDown 一開始就有
--- `if (modifiers & NSEventModifierFlagCommand) break;`（註解為 ignore Command+X hotkeys），
--- 所有「Command＋其他鍵」都不會送進 librime，因此 Super+Right 永遠觸發不到。
--- 簡體上屏改用 Option+→（Alt+Right）；Control+→ 不可用，會被 macOS 的切換桌面空間攔走。
-local SIMPLIFIED_KEYS = { ["Alt+Right"] = true, ["Super+Right"] = true }
-
--- Tab：接受目前第一個英文候選（ZingIME 式的「按 Tab 表態為英文」）。
--- 沒有英文候選時回傳 2，讓 key_binder 的 Tab → Control+1 照舊接手。
-function english_commit(key, env)
-  if key:repr() ~= "Tab" then
-    return 2
-  end
-  local context = env.engine.context
-  if not context:has_menu() or not first_english_text then
-    return 2
-  end
-  env.engine:commit_text(first_english_text)
-  first_english_text = nil
-  context:clear()
-  return 1
-end
-
 ---------------------------------------------------------------------------
 -- 選中候選的完整讀音（注音文／漢語拼音）
 --
@@ -471,6 +438,118 @@ local function pinyin_with_tone(syllable)
   return (base:gsub(target, PINYIN_TONE_MARKS[target][n], 1))
 end
 
+-- 把候選文字轉成讀音字串。mode 為 "bopomofo" 或 "pinyin"；反查不到回傳 nil。
+local function reading_of(text, mode)
+  local syllables = syllables_of(text)
+  if not syllables then return nil end
+  local parts = {}
+  for i, syllable in ipairs(syllables) do
+    if mode == "pinyin" then
+      parts[i] = pinyin_with_tone(syllable) or syllable
+    else
+      parts[i] = pinyin_to_bopomofo(syllable) or syllable
+    end
+  end
+  return table.concat(parts, mode == "pinyin" and PINYIN_SEPARATOR or BOPOMOFO_SEPARATOR)
+end
+
+-- 按住修飾鍵時，候選右側的提示改顯示讀音。用不同括號與簡體提示區分。
+local PREVIEW_OPTIONS = {
+  { option = "preview_bopomofo", mode = "bopomofo", open = "﹝", close = "﹞" },
+  { option = "preview_pinyin",   mode = "pinyin",   open = "〔", close = "〕" },
+}
+
+function simplified_hint(input, env)
+  local context = env.engine.context
+  local preview
+  for _, entry in ipairs(PREVIEW_OPTIONS) do
+    if context:get_option(entry.option) then preview = entry break end
+  end
+
+  for candidate in input:iter() do
+    local comment = candidate.comment
+    if preview then
+      local reading = reading_of(candidate.text, preview.mode)
+      if reading then
+        comment = preview.open .. reading .. preview.close
+      end
+    else
+      local simplified = tw_to_s:convert(candidate.text)
+      if simplified ~= candidate.text then
+        comment = "〔" .. simplified .. "〕"
+      end
+    end
+    yield(ShadowCandidate(candidate, candidate.type, candidate.text, comment))
+  end
+end
+
+-- 按住 Shift 看注音、按住 Control 看漢語拼音。放開就恢復簡體提示。
+local PREVIEW_MODIFIERS = {
+  Shift_L = "preview_bopomofo", Shift_R = "preview_bopomofo",
+  Control_L = "preview_pinyin", Control_R = "preview_pinyin",
+}
+
+function reading_preview(key, env)
+  local option = PREVIEW_MODIFIERS[key:repr():gsub("^Release%+", "")]
+  if not option then return 2 end
+  local context = env.engine.context
+  local want = not key:release()
+  if context:get_option(option) == want then return 2 end
+
+  -- set_option 會讓 librime 重跑 RefreshNonConfirmedComposition（engine.cc 的 OnOptionUpdate），
+  -- 而那會把高亮歸零。先記下再還原，否則選到第 3 個候選時一按 Shift 就跳回第 1 個。
+  local index = 0
+  pcall(function()
+    local composition = context.composition
+    if composition and not composition:empty() then
+      index = composition:back().selected_index or 0
+    end
+  end)
+  context:set_option(option, want)
+  if index > 0 and context:has_menu() then
+    pcall(function() context:highlight(index) end)
+  end
+  return 2   -- 不吃掉按鍵，修飾鍵的其他用途照常
+end
+
+-- Control + 數字：直接上屏阿拉伯數字。
+-- 只在「沒有組字」時攔截：組字中 Control+1~6 是選第 N 個候選，而且 Tab 與 Shift+Q 等鍵
+-- 都是轉送成 Control+N 來選字的，攔下來會把選字功能整組吃掉。
+local CONTROL_DIGITS = {}
+for digit = 0, 9 do CONTROL_DIGITS["Control+" .. digit] = tostring(digit) end
+
+function digit_commit(key, env)
+  if key:release() then return 2 end
+  local digit = CONTROL_DIGITS[key:repr()]
+  if not digit then return 2 end
+  local context = env.engine.context
+  if context:is_composing() then return 2 end
+  env.engine:commit_text(digit)
+  return 1
+end
+
+-- 注意：Squirrel 0.18 的 SquirrelInputController.m 在 NSEventTypeKeyDown 一開始就有
+-- `if (modifiers & NSEventModifierFlagCommand) break;`（註解為 ignore Command+X hotkeys），
+-- 所有「Command＋其他鍵」都不會送進 librime，因此 Super+Right 永遠觸發不到。
+-- 簡體上屏改用 Option+→（Alt+Right）；Control+→ 不可用，會被 macOS 的切換桌面空間攔走。
+local SIMPLIFIED_KEYS = { ["Alt+Right"] = true, ["Super+Right"] = true }
+
+-- Tab：接受目前第一個英文候選（ZingIME 式的「按 Tab 表態為英文」）。
+-- 沒有英文候選時回傳 2，讓 key_binder 的 Tab → Control+1 照舊接手。
+function english_commit(key, env)
+  if key:repr() ~= "Tab" then
+    return 2
+  end
+  local context = env.engine.context
+  if not context:has_menu() or not first_english_text then
+    return 2
+  end
+  env.engine:commit_text(first_english_text)
+  first_english_text = nil
+  context:clear()
+  return 1
+end
+
 local READING_KEYS = {
   ["Shift+Right"] = "bopomofo",  -- 選中候選的完整讀音
   ["Alt+Left"]    = "pinyin",    -- 選中候選的漢語拼音
@@ -508,18 +587,9 @@ function special_commit(key, env)
     return 1
   end
 
-  local syllables = syllables_of(candidate.text)
-  if syllables then
-    local parts = {}
-    for i, syllable in ipairs(syllables) do
-      if mode == "pinyin" then
-        parts[i] = pinyin_with_tone(syllable) or syllable
-      else
-        parts[i] = pinyin_to_bopomofo(syllable) or syllable
-      end
-    end
-    local sep = (mode == "pinyin") and PINYIN_SEPARATOR or BOPOMOFO_SEPARATOR
-    env.engine:commit_text(table.concat(parts, sep))
+  local reading = reading_of(candidate.text, mode)
+  if reading then
+    env.engine:commit_text(reading)
     context:clear()
     return 1
   end

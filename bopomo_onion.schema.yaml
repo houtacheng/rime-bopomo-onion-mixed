@@ -45,6 +45,8 @@ engine:
   processors:
     - ascii_composer
     - recognizer
+    - lua_processor@reading_preview
+    - lua_processor@digit_commit
     - lua_processor@special_commit
     - lua_processor@english_commit
     - key_binder
