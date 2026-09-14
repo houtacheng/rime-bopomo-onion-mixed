@@ -168,14 +168,17 @@ end
 local FIXED_DAYS = { ["後天"] = 2, ["大後天"] = 3, ["前天"] = -2, ["大前天"] = -3 }
 
 -- 在日期格式中插入「原詞＋日期」的併排形式。
--- 放在最常用的兩個格式之後（第 3、4 位），這樣加上原詞本身剛好佔滿第一頁六格。
+-- 放在最常用的兩個純日期格式之後（第 3～5 位），加上原詞本身剛好佔滿第一頁六格。
+-- 代價是純 YYYYMMDD 被擠到第二頁；想換回來就調整這裡的插入位置。
 local function date_formats_with_word(word, timestamp)
   local values = date_formats(timestamp)
   local d = os.date("*t", timestamp)
   local plain = string.format("%04d.%02d.%02d", d.year, d.month, d.day)
   local dated = string.format("%04d.%02d.%02d(%s)", d.year, d.month, d.day, weekday[d.wday])
+  local compact = string.format("%04d%02d%02d", d.year, d.month, d.day)
   table.insert(values, 3, word .. "（" .. plain .. "）")
   table.insert(values, 4, word .. " " .. dated)
+  table.insert(values, 5, word .. " " .. compact)
   return values
 end
 
