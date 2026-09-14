@@ -22,6 +22,7 @@ cangjie5*
 *.swp
 
 # 外觀編輯器的執行期資料
+tools/.debug-keys
 tools/rime-appearance/snapshots/
 tools/rime-appearance/.fonts.json
 tools/rime-appearance/app/build/

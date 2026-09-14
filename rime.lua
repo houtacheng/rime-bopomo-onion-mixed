@@ -484,13 +484,38 @@ function simplified_hint(input, env)
 end
 
 -- 按住 Shift 看注音、按住 Control 看漢語拼音。放開就恢復簡體提示。
+-- 排錯用：建立這個檔案後，按下的修飾鍵 repr 會被記錄下來；刪掉檔案即停止。
+local DEBUG_KEYS = (function()
+  local path = os.getenv("HOME") .. "/Library/Rime/tools/.debug-keys"
+  local fh = io.open(path, "r")
+  if fh then fh:close() return path end
+  return nil
+end)()
+
 local PREVIEW_MODIFIERS = {
   Shift_L = "preview_bopomofo", Shift_R = "preview_bopomofo",
   Control_L = "preview_pinyin", Control_R = "preview_pinyin",
 }
 
+-- repr() 會把所有修飾鍵前綴串在鍵名前（key_event.cc 的 KeyEvent::repr），
+-- 按下 Shift 時事件同時帶著 Shift_L 鍵碼與 shift 修飾位，repr 是「Shift+Shift_L」而非「Shift_L」。
+-- 所以只取最後一段鍵名，按下／放開一律用 key:release() 判斷。
+local function bare_key_name(key)
+  local repr = key:repr()
+  return repr:match("([^+]+)$") or repr
+end
+
 function reading_preview(key, env)
-  local option = PREVIEW_MODIFIERS[key:repr():gsub("^Release%+", "")]
+  local name = bare_key_name(key)
+  if DEBUG_KEYS then
+    local fh = io.open(DEBUG_KEYS, "a")
+    if fh then
+      fh:write(string.format("%s\trelease=%s\tbare=%s\n",
+                             key:repr(), tostring(key:release()), name))
+      fh:close()
+    end
+  end
+  local option = PREVIEW_MODIFIERS[name]
   if not option then return 2 end
   local context = env.engine.context
   local want = not key:release()
