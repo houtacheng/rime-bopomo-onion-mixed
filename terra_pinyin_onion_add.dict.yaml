@@ -18,7 +18,7 @@
 # ===============================
 ---
 name: terra_pinyin_onion_add
-version: "202304"
+version: "202304.1"
 sort: by_weight
 use_preset_vocabulary: true
 max_phrase_length: 7
@@ -1457,4 +1457,12 @@ min_phrase_weight: 100
 𡂎	(lv5)	0%
 𪚩	(gui5)	0%
 吆	(yao5)	0%
+##### 使用者補充（自行添加於此） #####
+# 格式：字<TAB>(拼音)<TAB>權重
+# 權重留空即可 —— 讓 vocabulary: essay-zh-hant-mc 的語料詞頻決定排序。
+# 填明確百分比會蓋過語料庫，可能把常用字擠到後面：例如 ti4 這組的
+# 「替」「惕」「剃」全都沒有權重，硬給補充字 1% 會讓它排到「替」前面。
+# 俶 通「倜」（俶儻＝倜儻）。原字典只收 chu4，缺 ti4 這個讀音。
+俶	(ti4)
+
 ### End ###
