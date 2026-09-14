@@ -66,6 +66,12 @@ macOS 鼠鬚管（Squirrel）設定，以**洋蔥純注音**為基礎，加上�
 
 ---
 
+## Windows（小狼毫）
+
+方案、詞庫、鍵位、Lua 功能在 Windows 上完全相同，只有外觀設定檔不同——
+本 repo 同時放了 `squirrel.custom.yaml`（macOS）與 `weasel.custom.yaml`（Windows），
+兩個前端各讀各的。安裝與對應關係見 **[docs/WINDOWS.md](docs/WINDOWS.md)**。
+
 ## 常用鍵位速查
 
 | 按鍵 | 作用 |
@@ -117,7 +123,8 @@ git clone https://github.com/houtacheng/rime-appearance-editor.git && cd rime-ap
 | `rime.lua` | 所有 Lua 擴充：候選排序、讀音輸出、日期數字轉換 |
 | `lua/english_common.lua` | 常用英文詞的詞頻排名表 |
 | `default.custom.yaml` | 全域鍵位與方案清單 |
-| `squirrel.custom.yaml` | 外觀設定與配色 |
+| `squirrel.custom.yaml` | 外觀設定與配色（macOS） |
+| `weasel.custom.yaml` | 外觀設定與配色（Windows） |
 | `essay-zh-hant-mc.txt` | 詞頻語料 |
 | `english_gloss.txt` | 中→英釋義表（CC-CEDICT 衍生） |
 

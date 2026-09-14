@@ -1,0 +1,62 @@
+# 位置：%APPDATA%\Rime\weasel.custom.yaml
+#
+# 小狼毫（Windows）的外觀設定，對應 macOS 的 squirrel.custom.yaml。
+# 兩個檔案可以並存——每個前端只讀自己的那份，所以整個 repo 可以同時服務兩個平台。
+#
+# 鍵位、方案、詞庫在兩邊完全相同，不需要任何調整；只有外觀設定的鍵名不一樣。
+
+patch:
+
+# ── 配色 ──────────────────────────────────────────────────────────
+  style/color_scheme: sunda                    # 小狼毫沒有亮暗兩套，只有一個
+
+# ── 版面 ──────────────────────────────────────────────────────────
+  style/horizontal: false                      # 對應 candidate_list_layout: stacked
+  style/vertical_text: false                   # 對應 text_orientation: horizontal
+  style/inline_preedit: false                  # 同名同義：false 為雙行，保留注音預覽
+  style/preedit_type: preview                  # 對應 inline_candidate: true
+                                               # composition = 顯示輸入碼；preview = 顯示選中候選
+  style/label_format: "%s."                    # 對應 candidate_format 的 [label]. 部分
+                                               # 小狼毫的提示碼與候選間距改由 layout 控制
+  style/paging_on_scroll: false
+  style/display_tray_icon: false
+
+# ── 字型 ──────────────────────────────────────────────────────────
+# macOS 的蘋方／蘋果儷中黑在 Windows 不存在，改用微軟正黑體。
+# 想更接近蘋方的話可自行安裝思源黑體，改成 "Noto Sans TC" 或 "Source Han Sans TC"。
+  style/font_face: "Microsoft JhengHei"
+  style/font_point: 20
+  style/comment_font_face: "Microsoft JhengHei"
+  style/comment_font_point: 14
+  style/label_font_face: "Consolas"            # 對應 Andale Mono，都是等寬
+  style/label_font_point: 14
+
+# ── 幾何 ──────────────────────────────────────────────────────────
+# 小狼毫把幾何全部收在 layout 底下，名稱與 Squirrel 不同。
+  style/layout/corner_radius: 7                # 對應 corner_radius
+  style/layout/round_corner: 0                 # 對應 hilited_corner_radius（候選條圓角）
+  style/layout/border_width: 0                 # Squirrel 的 -2 在這裡沒有對應，0 最接近
+  style/layout/candidate_spacing: 0            # 對應 line_spacing
+  style/layout/spacing: 0                      # 對應 spacing
+  style/layout/margin_x: 12
+  style/layout/margin_y: 8
+  style/layout/hilite_padding: 4
+  style/layout/min_width: 0
+  style/layout/shadow_radius: 0
+
+###################################################
+# 配色：與 squirrel.custom.yaml 的 sunda 完全相同。
+# 兩個前端的色值格式一致，都是 0xBBGGRR（BGR 順序）與 0xAABBGGRR（含透明度）。
+###################################################
+
+  preset_color_schemes/sunda:
+    name: "sunda"
+    author: "rime-appearance"
+    back_color: 0x000000
+    border_color: 0x00dddddd
+    text_color: 0xffffff
+    candidate_text_color: 0xffffff
+    comment_text_color: 0x888888
+    label_color: 0x888888
+    hilited_candidate_text_color: 0xffffff
+    hilited_candidate_back_color: 0x85f66e3b

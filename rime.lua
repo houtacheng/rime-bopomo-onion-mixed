@@ -445,7 +445,22 @@ end
 -- 11 萬筆做成 Lua table 會佔十幾 MB，所以改成對檔案做二分搜尋：
 -- 每次查詢約 17 次 seek，只在按住 Option 時才會用到。
 ---------------------------------------------------------------------------
-local GLOSS_PATH = os.getenv("HOME") .. "/Library/Rime/english_gloss.txt"
+-- 使用者資料目錄：macOS 是 ~/Library/Rime，Windows 是 %APPDATA%\Rime。
+-- librime-lua 有暴露 rime_api.get_user_data_dir()，用它就不必判斷平台。
+-- 斜線在 Windows 的檔案 API 也通，不需要換成反斜線。
+local function user_data_path(name)
+  local dir
+  if rime_api and rime_api.get_user_data_dir then
+    dir = rime_api.get_user_data_dir()
+  end
+  if not dir or dir == "" then   -- 舊版 librime-lua 沒有這個函式時的退路
+    dir = (os.getenv("APPDATA") and os.getenv("APPDATA") .. "/Rime")
+       or (os.getenv("HOME") .. "/Library/Rime")
+  end
+  return dir .. "/" .. name
+end
+
+local GLOSS_PATH = user_data_path("english_gloss.txt")
 local gloss_handle, gloss_size
 
 local function gloss_file()
@@ -539,7 +554,7 @@ end
 -- 按住 Shift 看注音、按住 Control 看漢語拼音。放開就恢復簡體提示。
 -- 排錯用：建立這個檔案後，按下的修飾鍵 repr 會被記錄下來；刪掉檔案即停止。
 local DEBUG_KEYS = (function()
-  local path = os.getenv("HOME") .. "/Library/Rime/tools/.debug-keys"
+  local path = user_data_path("tools/.debug-keys")
   local fh = io.open(path, "r")
   if fh then fh:close() return path end
   return nil
