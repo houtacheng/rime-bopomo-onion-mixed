@@ -11,7 +11,8 @@ python3 ~/Library/Rime/tools/rime-appearance/server.py
 ## 功能
 
 - **讀取目前外觀** —— 啟動時直接從 `squirrel.custom.yaml` 讀取現值
-- **字型** —— 列出本機 1500+ 個字型，清單中每個項目都用**它自己的字型**渲染，選之前就看得到長相
+- **字型** —— 列出本機 1500+ 個字型，顯示**可讀名稱**（標楷體、蘋方-繁 細體），
+  清單中每個項目都用它自己的字型渲染；中文名、英文名、PostScript 名稱都能搜
 - **配色** —— 列出 `squirrel.custom.yaml` 與鼠鬚管內建的所有配色；也可以用色票新增自己的配色
 - **即時預覽** —— 右側模擬候選窗，顏色、字型、圓角、間距、透明度都會跟著變
 - **套用並部署** —— 寫回設定檔後自動部署，並**確認真的生效**
@@ -21,6 +22,10 @@ python3 ~/Library/Rime/tools/rime-appearance/server.py
 
 **色值是 BGR 不是 RGB。** Rime 的 `0xBBGGRR` 與 `0xAABBGGRR` 都是反過來的，
 新增配色時要換算，別直接把 CSS 的 `#RRGGBB` 填進去。
+
+**字型有兩個名稱，別搞混。** `system_profiler` 回傳的 `_name` 是 PostScript 名稱
+（`DFKaiShu-SB-Estd-BF`），`fullname`／`family` 才是可讀名稱（`標楷體`）。
+介面顯示可讀名稱，但寫進 `font_face` 的必須是 PostScript 名稱。
 
 **`color_scheme:` 要填區塊名稱，不是顯示名稱。** 例如 `preset_color_schemes/mac_lamb`
 區塊裡寫著 `name: "lamb"`，但設定要填的是 `mac_lamb`。

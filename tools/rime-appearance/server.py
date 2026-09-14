@@ -249,13 +249,23 @@ def add_scheme(name, colors):
 
 # ---------------------------------------------------------------- 字型
 
+FONT_CACHE_VERSION = 2
+
+
 def read_fonts(refresh=False):
-    """列出本機字型的 PostScript 名稱。慢（約 15 秒），所以快取。"""
+    """列出本機字型。慢（約 15 秒），所以快取。
+
+    每筆包含 ps 與 name 兩個名稱：
+      ps   —— PostScript 名稱（DFKai-W14-WINP-BF），這才是 font_face 要填的值
+      name —— 可讀名稱（華康超特楷體(P)），給人看的
+    """
     if not refresh and os.path.exists(FONT_CACHE):
         try:
             with open(FONT_CACHE, encoding="utf-8") as fh:
-                return json.load(fh)
-        except (ValueError, OSError):
+                cached = json.load(fh)
+            if isinstance(cached, dict) and cached.get("v") == FONT_CACHE_VERSION:
+                return cached["fonts"]
+        except (ValueError, OSError, KeyError):
             pass
     try:
         out = subprocess.run(
@@ -264,17 +274,24 @@ def read_fonts(refresh=False):
         data = json.loads(out)
     except (subprocess.SubprocessError, ValueError, OSError):
         return []
-    names = set()
+    entries = {}
     for family in data.get("SPFontsDataType", []):
         for face in family.get("typefaces", []):
             ps = face.get("_name", "")
             # 以 . 或 - 開頭的是系統內部字型，選了也用不到
-            if ps and not ps.startswith(".") and not ps.startswith("-"):
-                names.add(ps)
-    fonts = sorted(names)
+            if not ps or ps.startswith(".") or ps.startswith("-"):
+                continue
+            fam = (face.get("family") or "").strip()
+            style = (face.get("style") or "").strip()
+            name = (face.get("fullname") or "").strip() or fam or ps
+            # 可讀名稱以 . 開頭的同樣是系統內部字型（PostScript 名稱看不出來）
+            if name.startswith("."):
+                continue
+            entries[ps] = {"ps": ps, "name": name, "family": fam, "style": style}
+    fonts = sorted(entries.values(), key=lambda e: (e["name"], e["ps"]))
     try:
         with open(FONT_CACHE, "w", encoding="utf-8") as fh:
-            json.dump(fonts, fh)
+            json.dump({"v": FONT_CACHE_VERSION, "fonts": fonts}, fh)
     except OSError:
         pass
     return fonts

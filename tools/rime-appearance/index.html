@@ -260,12 +260,24 @@ function buildFontPickers(){
     box.innerHTML = `<input type="text" autocomplete="off" placeholder="搜尋字型…">
       <div class="fontlist"></div>`;
     const input = box.querySelector('input'), list = box.querySelector('.fontlist');
+    // 顯示可讀名稱，但寫進設定的是 PostScript 名稱。搜尋兩者皆可命中。
     const fill = q => {
       const ql = (q||'').toLowerCase();
-      const hits = FONTS.filter(f => !ql || f.toLowerCase().includes(ql)).slice(0,300);
+      // 相關性：顯示名稱開頭命中 > 顯示名稱內含 > 家族名稱 > PostScript 名稱
+      const score = f => {
+        const n = f.name.toLowerCase();
+        if(n.startsWith(ql)) return 0;
+        if(n.includes(ql)) return 1;
+        if((f.family||'').toLowerCase().includes(ql)) return 2;
+        if(f.ps.toLowerCase().includes(ql)) return 3;
+        return 9;
+      };
+      const hits = (ql ? FONTS.filter(f => score(f) < 9)
+                          .sort((a,b) => score(a)-score(b) || a.name.localeCompare(b.name))
+                       : FONTS).slice(0,300);
       list.innerHTML = hits.map(f =>
-        `<div data-f="${f}"><span class="sample" style="font-family:'${f}',sans-serif">${f} 注音輸入 Aa 123</span>
-         <span class="ps">${f}</span></div>`).join('') ||
+        `<div data-f="${f.ps}"><span class="sample" style="font-family:'${f.ps}',sans-serif">${f.name} 注音輸入 Aa 123</span>
+         <span class="ps">${f.ps}</span></div>`).join('') ||
         '<div style="color:var(--muted)">沒有符合的字型</div>';
     };
     // 聚焦時全選，這樣直接打字就是重新搜尋，不會接在原值後面
@@ -274,15 +286,20 @@ function buildFontPickers(){
     input.addEventListener('blur', () => setTimeout(() => {
       list.classList.remove('open');
       // 沒選中任何字型就還原成原值，不要把搜尋字串留在欄位裡
-      if(input.value !== SETTINGS[key]) box._set(SETTINGS[key]);
+      box._set(SETTINGS[key]);
     }, 180));
     list.addEventListener('mousedown', e => {
       const item = e.target.closest('[data-f]'); if(!item) return;
-      SETTINGS[key] = item.dataset.f; input.value = item.dataset.f;
-      input.style.fontFamily = `'${item.dataset.f}',sans-serif`;
+      SETTINGS[key] = item.dataset.f; box._set(item.dataset.f);
       list.classList.remove('open'); render();
     });
-    box._set = v => { input.value = v||''; input.style.fontFamily = v?`'${v}',sans-serif`:''; };
+    // 欄位顯示可讀名稱；找不到對應字型就原樣顯示存檔的值
+    box._set = v => {
+      const hit = FONTS.find(f => f.ps === v);
+      input.value = hit ? hit.name : (v || '');
+      input.style.fontFamily = v ? `'${v}',sans-serif` : '';
+      input.title = v || '';
+    };
   });
   $('#font_count').textContent = `本機 ${FONTS.length} 個字型`;
 }
