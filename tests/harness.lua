@@ -5,8 +5,11 @@ local M = {}
 M.root = (arg[0]:match("^(.*)/[^/]*$") or ".") .. "/.."
 
 -- 假的候選與 yield：濾鏡吐出來的東西收進 M.collected
-function M.install()
-  rime_api = { get_user_data_dir = function() return M.root .. "/tests" end }  -- 避開真實的 tools/.debug-keys
+-- data_dir 決定 rime.lua 去哪裡找 english_gloss.txt 與 tools/.debug-keys。
+-- 預設指向 tests/，這樣排錯記錄不會被測試寫髒；要查釋義表的測試才傳 repo 根目錄。
+function M.install(data_dir)
+  local dir = data_dir or (M.root .. "/tests")
+  rime_api = { get_user_data_dir = function() return dir end }
   Opencc = function() return { convert = function(_, text) return text end } end
   ReverseDb = function() error("測試未提供反查表") end
   Candidate = function(kind, s, e, text, comment)

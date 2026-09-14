@@ -199,10 +199,7 @@ end
 
 local FIXED_DAYS = { ["後天"] = 2, ["大後天"] = 3, ["前天"] = -2, ["大前天"] = -3 }
 
--- 在日期格式中插入「原詞＋日期」的併排形式。
--- 放在最常用的兩個純日期格式之後（第 3～5 位），加上原詞本身剛好佔滿第一頁六格。
--- 代價是純 YYYYMMDD 被擠到第二頁；想換回來就調整這裡的插入位置。
--- 時間版的併排形式，與日期同一套做法
+-- 在時間格式中插入「原詞＋時刻」的併排形式，與下面的日期版同一套做法。
 local function time_formats_with_word(word, timestamp)
   local values = time_formats(timestamp)
   local clock = os.date("%H:%M", timestamp)
@@ -211,6 +208,9 @@ local function time_formats_with_word(word, timestamp)
   return values
 end
 
+-- 在日期格式中插入「原詞＋日期」的併排形式。
+-- 放在最常用的兩個純日期格式之後（第 3～5 位），加上原詞本身剛好佔滿第一頁六格。
+-- 代價是純 YYYYMMDD 被擠到第二頁；想換回來就調整這裡的插入位置。
 local function date_formats_with_word(word, timestamp)
   local values = date_formats(timestamp)
   local d = os.date("*t", timestamp)
@@ -240,7 +240,12 @@ local function relative_time(text)
   for _, entry in ipairs(REL_UNITS) do
     local unit, kind, scale = entry[1], entry[2], entry[3]
     if #rest >= #unit and rest:sub(-#unit) == unit then
-      local count = chinese_to_number(rest:sub(1, #rest - #unit))
+      local quantity = rest:sub(1, #rest - #unit)
+      -- 單字單位不接受省略數量：「日後」「年前」「月前」都是常用詞，不是在算日子。
+      -- 兩個字以上的單位沒有這個問題（沒有「小時後」這種詞），所以「小時後」仍等同
+      -- 「一小時後」。#unit 以位元組算，一個漢字是 3 個。
+      if quantity == "" and #unit <= 3 then return nil end
+      local count = chinese_to_number(quantity)
       if not count then return nil end
       local amount = sign * count * scale
       -- 數量可以是小數（半天、半個月、1.5 年）。os.time 與 os.date 的欄位必須是整數，

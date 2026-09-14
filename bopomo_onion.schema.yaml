@@ -282,6 +282,10 @@ key_binder:
     - {accept: Shift+X, send: Control+6, when: has_menu}
 ##回復到 composing 狀態：
 #關#    - {accept: Shift+space, send: Shift+Left, when: paging} #於選單列選字時，回復到輸入列（避免有時回復不了，故增加）。
+    # 注意：lua_processor@english_commit 排在 key_binder 之前，只要當下有英文候選就會
+    # 把 Tab 吃掉去上屏英文。因此下面這條只在「打了聲調或標點、英文翻譯器產不出候選」時
+    # 才輪得到，純字母輸入時形同虛設。要讓 Tab 在選字狀態一律回到輸入列，
+    # 得改 english_commit，而不是加 key_binder 規則。
     - {accept: Tab, send: Shift+Left, when: paging} #於選單列選字時，回復到輸入列（避免有時回復不了，故增加）。
 ### 空白鍵 ###
     - {accept: space, send: Return, when: paging} #方向鍵選字時，space直接上屏（避免被一聲空格影響）
