@@ -35,19 +35,35 @@ function M.one(text, kind)
   end }
 end
 
+-- 假的 context。committed 依序記下上屏的內容，組字狀態會隨 commit/clear 改變，
+-- 這樣連續按鍵的測試才貼近真實。
 function M.context(opts)
   opts = opts or {}
   local options = {}
-  return {
+  local ctx
+  ctx = {
     input = opts.input or "",
+    composing = opts.composing ~= false,
+    menu = opts.menu ~= false,
+    committed = {},
     get_option = function(_, key) return options[key] == true end,
     set_option = function(_, key, value) options[key] = value end,
-    is_composing = function() return opts.composing ~= false end,
-    has_menu = function() return opts.menu ~= false end,
+    is_composing = function() return ctx.composing end,
+    has_menu = function() return ctx.menu and ctx.composing end,
     get_selected_candidate = function() return opts.candidate end,
     highlight = function() end,
-    clear = function() end,
+    commit = function() ctx.committed[#ctx.committed + 1] = "〔組字〕"; ctx.composing = false end,
+    clear = function() ctx.composing = false end,
   }
+  return ctx
+end
+
+-- 配一個假的 engine：上屏的文字同樣記進 ctx.committed
+function M.env(ctx)
+  return { engine = {
+    context = ctx,
+    commit_text = function(_, text) ctx.committed[#ctx.committed + 1] = text end,
+  } }
 end
 
 -- 計分板

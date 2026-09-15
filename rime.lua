@@ -838,6 +838,12 @@ end
 -- 兩個平台都成立——不依賴放開事件何時抵達（小狼毫是按下與放開同時送達）。
 local pending_preview = nil   -- { option = 剛切換的選項, state = 切換前的三個選項狀態 }
 
+-- 使用者是不是真的按著 Control。判斷方式同上：實體按下時作業系統會先送一個單獨的
+-- Control_L／Control_R 事件，key_binder 轉送出來的 Control+N（Shift+Q、Tab 選字）
+-- 前面沒有那個事件，前一個按鍵身上也不帶 ctrl。digit_commit 靠這個分辨「要打數字」
+-- 與「要選候選」。不看放開事件，所以小狼毫的按下與放開同時送達也不影響。
+local control_held = false
+
 local function preview_state(context)
   local state = {}
   for _, entry in ipairs(PREVIEW_OPTIONS) do
@@ -892,6 +898,14 @@ function reading_preview(key, env)
   local context = env.engine.context
   local option = PREVIEW_MODIFIERS[name]
 
+  if not key:release() then
+    if name == "Control_L" or name == "Control_R" then
+      control_held = true
+    elseif not option then
+      control_held = control_held and key:ctrl()
+    end
+  end
+
   -- 剛才那下修飾鍵其實是組合鍵的前半段？把它還原（見上方說明）。
   -- 修飾鍵自己的事件（含放開）不算，否則小狼毫立刻送達的放開就會把待判狀態吃掉。
   if pending_preview and not option then
@@ -944,9 +958,13 @@ function reading_preview(key, env)
 end
 
 
--- Control + 數字：直接上屏阿拉伯數字。
--- 只在「沒有組字」時攔截：組字中 Control+1~6 是選第 N 個候選，而且 Tab 與 Shift+Q 等鍵
--- 都是轉送成 Control+N 來選字的，攔下來會把選字功能整組吃掉。
+-- Control + 數字：直接上屏阿拉伯數字，一鍵一個。
+--
+-- 組字中的 Control+N 有兩種來源：使用者實體按著 Control 想打數字，以及 key_binder
+-- 為了選字轉送出來的（Tab 與 Shift+Q 那組選字鍵全都轉送成 Control+N）。攔錯會把
+-- 選字功能整組吃掉，所以看 control_held——只有前面真的出現過實體 Control 鍵事件才算。
+--
+-- 組字中要先把目前候選上屏再輸出數字，否則數字會插在還沒上屏的那串字前面，順序就反了。
 local CONTROL_DIGITS = {}
 for digit = 0, 9 do CONTROL_DIGITS["Control+" .. digit] = tostring(digit) end
 
@@ -955,7 +973,25 @@ function digit_commit(key, env)
   local digit = CONTROL_DIGITS[key:repr()]
   if not digit then return 2 end
   local context = env.engine.context
-  if context:is_composing() then return 2 end
+
+  if context:is_composing() then
+    if not control_held then return 2 end   -- key_binder 轉送來選字的，讓它過
+    -- context:commit() 走的是正常上屏路徑，選字會計入詞頻學習；舊版 librime-lua
+    -- 沒有綁這個方法，退回手動上屏再清空。
+    local ok = pcall(function() context:commit() end)
+    if not ok then
+      -- 退路要拿整串待上屏的文字，不能只拿選中的候選——已經確認過的前段會掉。
+      local text
+      pcall(function() text = context:get_commit_text() end)
+      if not text or text == "" then
+        local candidate = context:has_menu() and context:get_selected_candidate()
+        text = candidate and candidate.text
+      end
+      if text and text ~= "" then env.engine:commit_text(text) end
+      context:clear()
+    end
+  end
+
   env.engine:commit_text(digit)
   return 1
 end
