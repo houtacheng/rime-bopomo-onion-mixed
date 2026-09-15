@@ -14,6 +14,14 @@ patch:
   style/inline_candidate: true # 選中候選就地顯示在游標處，上下鍵選字時即時改寫
                                                # 註：終端機與 Electron 應用程式對行內編輯支援不一，
                                                # 有異常就改回 false，或在 app_options 對該程式設 no_inline: true
+
+# ── 個別程式 ──────────────────────────────────────────────────────
+# 就地顯示是把文字即時寫進應用程式的輸入區，而部分程式會把它當成真的輸入。
+# Signal 就是一例：還在選字它就開始搜尋，上下鍵改候選也跟著改搜尋字串，
+# 等到按 Return 時它的焦點早已跳到第一個搜尋結果，上屏的字就跑進那個對話框。
+# 只對這類程式關掉就地顯示，其他程式照舊。
+  "app_options/org.whispersystems.signal-desktop":
+    no_inline: true
   style/status_message_type: mix # 切換方案時的提示樣式：long | short | mix
   style/mutual_exclusive: false # 候選窗與狀態提示是否互斥顯示
   style/memorize_size: true # linear 版面下記住候選窗長度，避免首選位置跳動

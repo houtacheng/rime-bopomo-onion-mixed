@@ -560,7 +560,32 @@ Rime 的鍵位判定是**清單順序優先**，不是「條件越精確越優�
 
 ### 終端機或 Electron 應用程式顯示異常
 
-`style/inline_candidate: true` 會把文字即時寫進應用程式的輸入區，部分程式支援不完整。改回 `false`，或針對特定程式在 `squirrel.custom.yaml` 的 `app_options` 設 `no_inline: true`。
+`style/inline_candidate: true` 會把選中的候選**即時寫進應用程式的輸入區**，讓你在游標處就看到結果。
+多數程式沒問題，但有些程式會把它當成真的輸入。
+
+典型症狀（Signal 的搜尋框就是一例）：
+
+- 還在選字，程式就開始搜尋
+- 上下鍵移動候選，搜尋字串跟著一直變
+- 按 `Return` 上屏時，字跑到別的欄位——因為程式早就自己把焦點移走了
+
+**只對那個程式關掉就地顯示**，其他程式不受影響。在 `squirrel.custom.yaml` 的 `patch:` 底下加：
+
+```yaml
+  "app_options/org.whispersystems.signal-desktop":
+    no_inline: true
+```
+
+程式的 bundle ID 這樣查：
+
+```bash
+osascript -e 'id of app "Signal"'
+```
+
+改完重新部署，**並且重開那個程式**——`app_options` 是建立輸入連線時才套用的，開著的視窗不會馬上改變。
+內建的設定已經對終端機、MacVim 這類程式做了同樣的事，照著那個格式加即可。
+
+真的不行才改全域的 `style/inline_candidate: false`，那會連正常的程式也一起失去就地預覽。
 
 ---
 
