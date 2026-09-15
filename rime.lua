@@ -670,6 +670,10 @@ local function currency_conversions(value, code)
   return out, "〔匯率 " .. tostring(RATES.date or "?") .. "〕"
 end
 
+-- 單位或貨幣都試一次，回傳候選、註解、以及要顯示的單位寫法
+-- （貨幣代碼慣例大寫，度量單位維持小寫）
+local conversions_for
+
 local function unit_conversions(value, unit)
   unit = UNIT_ALIASES[unit] or unit
   local temperature = temperature_conversions(value, unit)
@@ -691,6 +695,14 @@ local function unit_conversions(value, unit)
   return nil
 end
 
+conversions_for = function(value, unit)
+  local metric = unit_conversions(value, unit:lower())
+  if metric and #metric > 0 then return metric, "〔換算〕", unit:lower() end
+  local money, label = currency_conversions(value, unit)
+  if money then return money, label, unit:upper() end
+  return nil
+end
+
 function number_formats(input, segment, env)
   if input == "#" then
     yield(Candidate("number", segment.start, segment._end, "數字輸入", "繼續輸入阿拉伯數字"))
@@ -702,17 +714,30 @@ function number_formats(input, segment, env)
   -- 數字＋單位 → 換算（100cm、5kg、98f）
   local amount, unit = body:match("^([%d%.,]+)(%a[%a%d^]*)$")
   if amount then
-    local number = tonumber((amount:gsub(",", "")))
-    local conversions = unit_conversions(number, unit:lower())
-    local label = "〔換算〕"
-    if not conversions or #conversions == 0 then
-      conversions, label = currency_conversions(number, unit)
-    end
-    if conversions and #conversions > 0 then
+    local conversions, label = conversions_for(tonumber((amount:gsub(",", ""))), unit)
+    if conversions then
       for _, text in ipairs(conversions) do
         yield(Candidate("number", segment.start, segment._end, text, label))
       end
       return
+    end
+  end
+
+  -- 算式＋單位 → 把整條鏈顯示出來：100+20=120USD=166.79 CAD
+  -- 算過的式子留在候選裡，才看得出這個數字是怎麼來的。
+  local expression, expression_unit = body:match("^([%d%.,%+%-%*/%%%^%(%)]+)(%a[%a%d^]*)$")
+  if expression and expression:find("[%+%-%*/%%%^%(%)]") then
+    local value = evaluate(expression)
+    local shown = value and format_number(value)
+    if shown then
+      local conversions, label, display = conversions_for(value, expression_unit)
+      if conversions then
+        local head = expression .. "=" .. shown .. display .. "="
+        for _, text in ipairs(conversions) do
+          yield(Candidate("number", segment.start, segment._end, head .. text, label))
+        end
+        return
+      end
     end
   end
 
