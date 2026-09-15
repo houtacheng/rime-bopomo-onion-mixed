@@ -45,6 +45,12 @@ H.check("不認得的單位就不給", candidates("100xyz"), "")
 
 print("\n算式＋單位：整條鏈一起顯示")
 H.check("12*3cm", first("12*3cm"), "12*3=36cm=14.1732 in")
+-- 兩種寫法成對出現：帶算式的在前，只有結果的緊接在後
+H.check("同一個目標單位給兩種寫法",
+  candidates("12*3cm"):match("^12%*3=36cm=14%.1732 in\t14%.1732 in\t") ~= nil, true)
+H.check("第一頁六格＝三個目標單位各兩種",
+  select(2, candidates("12*3cm"):gsub("\t", "")) >= 5, true)
+H.check("沒有單位時結果優先、算式第二", candidates("100+20"):match("^120\t100%+20=120$") ~= nil, true)
 H.check("攝氏算完再換", first("(20+5)c"), "(20+5)=25c=77 ℉")
 H.check("除法也算算式", first("50/2kg"), "50/2=25kg=55.1156 lb")
 H.check("算不出來就不給", candidates("1+*2cm"), "")
@@ -70,6 +76,9 @@ else
   H.check("算式＋貨幣的鏈：100+20=120USD=…",
     first("100+20usd"):match("^100%+20=120USD=[%d,]+%.%d%d TWD$") ~= nil, true)
   H.check("加幣在鏈裡", candidates("100+20usd"):find("=120USD=", 1, true) ~= nil, true)
+  H.check("加幣也有不帶算式的寫法",
+    candidates("100+20usd"):find("\t166.79 CAD\t", 1, true) ~= nil
+      or candidates("100+20usd"):find("\t166.79 CAD", 1, true) ~= nil, true)
 end
 
 print("\n原有的數字格式沒被影響")

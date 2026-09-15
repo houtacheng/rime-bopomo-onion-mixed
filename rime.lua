@@ -732,9 +732,12 @@ function number_formats(input, segment, env)
     if shown then
       local conversions, label, display = conversions_for(value, expression_unit)
       if conversions then
+        -- 每個目標單位給兩種寫法：帶算式的與只有結果的，成對排在一起，
+        -- 這樣第一頁就同時看得到兩種形式，不必翻頁去找另一種。
         local head = expression .. "=" .. shown .. display .. "="
         for _, text in ipairs(conversions) do
           yield(Candidate("number", segment.start, segment._end, head .. text, label))
+          yield(Candidate("number", segment.start, segment._end, text, label))
         end
         return
       end
@@ -753,11 +756,13 @@ function number_formats(input, segment, env)
     return
   end
 
-  -- 明確的算式（有 + * ^ ( ) %）：計算結果優先
+  -- 明確的算式（有 + * ^ ( ) %）：結果優先，帶算式的排第二。
+  -- 這裡跟「算式＋單位」相反：沒有單位可換算時，帶算式的那個只是把你打的字再寫一次。
   if body:find("[%+%*%^%(%)%%]") then
     local value = format_number(evaluate(body))
     if value then
       yield(Candidate("number", segment.start, segment._end, value, "〔計算〕"))
+      yield(Candidate("number", segment.start, segment._end, body .. "=" .. value, "〔計算〕"))
     end
     return
   end
