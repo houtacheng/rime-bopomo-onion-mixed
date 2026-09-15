@@ -40,6 +40,11 @@ for test in test_*.lua; do
   "$LUA" "$test" || failed=1
 done
 
+# 數字上屏的方式依平台而異，macOS 那條在上面跑過了，這裡補 Windows 那條
+echo
+echo "── test_digit.lua（APPDATA=... 模擬 Windows）──────"
+APPDATA=/tmp "$LUA" test_digit.lua || failed=1
+
 echo
 if [ "$failed" -eq 0 ]; then
   echo "全部通過"

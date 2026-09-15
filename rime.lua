@@ -958,21 +958,70 @@ function reading_preview(key, env)
 end
 
 
--- Control + 數字：直接上屏阿拉伯數字，一鍵一個。
+-- Control + 數字：直接輸出阿拉伯數字。
 --
 -- 組字中的 Control+N 有兩種來源：使用者實體按著 Control 想打數字，以及 key_binder
 -- 為了選字轉送出來的（Tab 與 Shift+Q 那組選字鍵全都轉送成 Control+N）。攔錯會把
 -- 選字功能整組吃掉，所以看 control_held——只有前面真的出現過實體 Control 鍵事件才算。
 --
--- 組字中要先把目前候選上屏再輸出數字，否則數字會插在還沒上屏的那串字前面，順序就反了。
+-- 上屏方式兩個平台不同，原因是實測出來的前端差異：鼠鬚管只送得出「按鍵抵達時 session
+-- 已經在組字」的上屏，從沒組字的狀態憑空生一個又立刻結束，它當作沒發生（候選列會正常
+-- 跳出來，所以不是 librime 的問題）。小狼毫沒這個限制。
+-- 因此 macOS 把數字累積成一次組字、放開 Control 時才上屏：那一刻 session 還在組字，
+-- 送得出去，而且打的過程中候選列會顯示目前累積到哪。
+local COMMIT_NEEDS_COMPOSITION = os.getenv("APPDATA") == nil
+
 local CONTROL_DIGITS = {}
 for digit = 0, 9 do CONTROL_DIGITS["Control+" .. digit] = tostring(digit) end
 
+local MODIFIER_KEYS = {
+  Shift_L = true, Shift_R = true, Control_L = true, Control_R = true,
+  Alt_L = true, Alt_R = true, Super_L = true, Super_R = true, Caps_Lock = true,
+}
+
+-- 借道既有的數字輸入：「#N」的第一個候選就是那個數字本身（number_formats 的第一條），
+-- 所以這串組字上屏出來就是打下去的數字。
+local pending_digits = false
+
+local function flush_digits(context)
+  pending_digits = false
+  if not pcall(function() context:commit() end) then context:clear() end
+end
+
 function digit_commit(key, env)
-  if key:release() then return 2 end
-  local digit = CONTROL_DIGITS[key:repr()]
-  if not digit then return 2 end
   local context = env.engine.context
+  local repr = key:repr()
+  local name = repr:match("([^+]+)$") or repr
+  local digit = (not key:release()) and CONTROL_DIGITS[repr] or nil
+
+  -- 累積中的數字組字：再來一個數字就接上去，放開 Control 或改按別的鍵就上屏
+  if pending_digits then
+    if not context:is_composing() then
+      pending_digits = false           -- 組字被別的元件清掉了，當作沒在累積
+    elseif digit then
+      context:push_input(digit)
+      return 1
+    elseif key:release() then
+      if name == "Control_L" or name == "Control_R" then
+        flush_digits(context)
+        return 1
+      end
+      return 2
+    elseif name == "Escape" then
+      pending_digits = false           -- 反悔：整串丟掉，不要上屏
+      context:clear()
+      return 1
+    elseif name == "BackSpace" then
+      return 2                         -- 交給編輯器退掉最後一個數字
+    elseif not MODIFIER_KEYS[name] then
+      flush_digits(context)            -- 先把數字送出去，這個鍵再照常處理
+      return 2
+    else
+      return 2
+    end
+  end
+
+  if not digit then return 2 end
 
   if context:is_composing() then
     if not control_held then return 2 end   -- key_binder 轉送來選字的，讓它過
@@ -990,6 +1039,15 @@ function digit_commit(key, env)
       if text and text ~= "" then env.engine:commit_text(text) end
       context:clear()
     end
+    env.engine:commit_text(digit)
+    return 1
+  end
+
+  if COMMIT_NEEDS_COMPOSITION then
+    context:clear()
+    context:push_input("#" .. digit)
+    pending_digits = true
+    return 1
   end
 
   env.engine:commit_text(digit)
