@@ -53,10 +53,10 @@ function M.context(opts)
     get_selected_candidate = function() return opts.candidate end,
     highlight = function() end,
     push_input = function(_, text) ctx.input = ctx.input .. text; ctx.composing = true end,
-    get_commit_text = function() return ctx.input:match("^#(%d+)$") or "〔組字〕" end,
-    -- 「#N」的第一個候選就是那個數字本身（number_formats 的第一條），其餘一律記成〔組字〕
+    get_commit_text = function() return ctx.input:match("^#(.+)$") or "〔組字〕" end,
+    -- 「#N」的第一個候選就是打下去的那串數字（number_formats 的第一條），其餘一律記成〔組字〕
     commit = function()
-      ctx.committed[#ctx.committed + 1] = ctx.input:match("^#(%d+)$") or "〔組字〕"
+      ctx.committed[#ctx.committed + 1] = ctx.input:match("^#(.+)$") or "〔組字〕"
       ctx.composing, ctx.input = false, ""
     end,
     clear = function() ctx.composing, ctx.input = false, "" end,

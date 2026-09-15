@@ -346,7 +346,7 @@ editor:
 ########################## 用正則調出各種功能 ##############################
 recognizer:
   patterns:
-    number_input: "^#[0-9]*$"
+    number_input: "^#[0-9.,/-]*$"   # 允許數字夾標點：1.、2026/09/15、3-5
     # uppercase: "^[A-Z][-_+.'0-9A-Za-z]*$"
     url: "^(https?:|ftp:|mailto:|file:).*$"
     email: "^[a-z][-_.0-9a-z]*@.*$"

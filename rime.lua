@@ -486,6 +486,12 @@ function number_formats(input, segment, env)
     yield(Candidate("number", segment.start, segment._end, "數字輸入", "繼續輸入阿拉伯數字"))
     return
   end
+  -- 數字夾標點（1.、2026/09/15、3-5）只給原樣，中文數字那幾種轉換對它沒有意義
+  local mixed = input:match("^#([%d][%d%.,/%-]*)$")
+  if mixed and mixed:find("[^%d]") then
+    yield(Candidate("number", segment.start, segment._end, mixed, "數字"))
+    return
+  end
   local raw = input:match("^#(%d+)$")
   if not raw then return end
   -- 原始阿拉伯數字放第一位：大千配置把 0-9 全用作注音鍵，這是中文模式下打數字的出口。
@@ -974,6 +980,14 @@ local COMMIT_NEEDS_COMPOSITION = os.getenv("APPDATA") == nil
 local CONTROL_DIGITS = {}
 for digit = 0, 9 do CONTROL_DIGITS["Control+" .. digit] = tostring(digit) end
 
+-- 數字串裡會用到的標點。這幾顆鍵在 default.custom.yaml 裡是模式切換
+-- （Control+, 切中英、Control+. 切全形、Control+/ 切標點），所以**只在數字串進行中**
+-- 才攔截：沒在打數字時原本的快捷鍵照常有效。
+local CONTROL_PUNCT = {
+  ["Control+period"] = ".", ["Control+comma"] = ",",
+  ["Control+minus"] = "-", ["Control+slash"] = "/",
+}
+
 local MODIFIER_KEYS = {
   Shift_L = true, Shift_R = true, Control_L = true, Control_R = true,
   Alt_L = true, Alt_R = true, Super_L = true, Super_R = true, Caps_Lock = true,
@@ -982,6 +996,7 @@ local MODIFIER_KEYS = {
 -- 借道既有的數字輸入：「#N」的第一個候選就是那個數字本身（number_formats 的第一條），
 -- 所以這串組字上屏出來就是打下去的數字。
 local pending_digits = false
+local digit_run = false        -- 小狼毫那條路用：這一串 Control 組合鍵裡已經打過數字了
 
 local function flush_digits(context)
   pending_digits = false
@@ -993,13 +1008,17 @@ function digit_commit(key, env)
   local repr = key:repr()
   local name = repr:match("([^+]+)$") or repr
   local digit = (not key:release()) and CONTROL_DIGITS[repr] or nil
+  local punct = (not key:release()) and CONTROL_PUNCT[repr] or nil
+  -- 放開 Control 就結束這一串，下一次按 Control+. 才會是原本的全形切換
+  if key:release() and (name == "Control_L" or name == "Control_R") then digit_run = false end
+  if not control_held then digit_run = false end
 
   -- 累積中的數字組字：再來一個數字就接上去，放開 Control 或改按別的鍵就上屏
   if pending_digits then
     if not context:is_composing() then
       pending_digits = false           -- 組字被別的元件清掉了，當作沒在累積
-    elseif digit then
-      context:push_input(digit)
+    elseif digit or punct then
+      context:push_input(digit or punct)
       return 1
     elseif key:release() then
       if name == "Control_L" or name == "Control_R" then
@@ -1019,6 +1038,11 @@ function digit_commit(key, env)
     else
       return 2
     end
+  end
+
+  if punct and digit_run and not context:is_composing() then
+    env.engine:commit_text(punct)
+    return 1
   end
 
   if not digit then return 2 end
@@ -1051,6 +1075,7 @@ function digit_commit(key, env)
   end
 
   env.engine:commit_text(digit)
+  digit_run = true
   return 1
 end
 

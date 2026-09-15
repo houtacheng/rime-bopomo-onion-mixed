@@ -52,6 +52,25 @@ ctx = H.context({ composing = false, menu = false })
 feed(ctx, CTRL, key("Control+0"), RELEASE_CTRL)
 H.check("Control+0 也可以", output(ctx), "0")
 
+print("\n數字串裡的標點")
+ctx = H.context({ composing = false, menu = false })
+feed(ctx, CTRL, key("Control+1"), key("Control+period"), RELEASE_CTRL)
+H.check("Control+. 在數字串中是句點", output(ctx), WINDOWS and "1|." or "1.")
+
+ctx = H.context({ composing = false, menu = false })
+feed(ctx, CTRL, key("Control+2"), key("Control+0"), key("Control+2"), key("Control+6"),
+     key("Control+slash"), key("Control+0"), key("Control+9"), RELEASE_CTRL)
+H.check("日期形式 2026/09", output(ctx), WINDOWS and "2|0|2|6|/|0|9" or "2026/09")
+
+ctx = H.context({ composing = false, menu = false })
+H.check("沒在打數字時不攔截，讓模式切換照舊",
+  feed(ctx, RELEASE_CTRL, CTRL, key("Control+period")), 2)
+
+ctx = H.context({ composing = false, menu = false })
+feed(ctx, CTRL, key("Control+1"), RELEASE_CTRL)
+H.check("打完數字放開 Control，下一次 Control+. 就還給全形切換",
+  feed(ctx, CTRL, key("Control+period")), 2)
+
 if not WINDOWS then
   print("\n累積中的編輯")
   ctx = H.context({ composing = false, menu = false })
