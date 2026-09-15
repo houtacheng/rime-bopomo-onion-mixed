@@ -63,6 +63,16 @@ feed(ctx, CTRL, key("Control+2"), key("Control+0"), key("Control+2"), key("Contr
 H.check("日期形式 2026/09", output(ctx), WINDOWS and "2|0|2|6|/|0|9" or "2026/09")
 
 ctx = H.context({ composing = false, menu = false })
+feed(ctx, CTRL, key("Control+1"), key("Control+3"), key("Control+semicolon"),
+     key("Control+3"), key("Control+0"), RELEASE_CTRL)
+H.check("時間 13:30（分號鍵直接給冒號）", output(ctx), WINDOWS and "1|3|:|3|0" or "13:30")
+
+ctx = H.context({ composing = false, menu = false })
+feed(ctx, CTRL, key("Control+9"), key("Control+Shift+colon"), key("Control+0"),
+     key("Control+0"), RELEASE_CTRL)
+H.check("按了 Shift 也認得", output(ctx), WINDOWS and "9|:|0|0" or "9:00")
+
+ctx = H.context({ composing = false, menu = false })
 H.check("沒在打數字時不攔截，讓模式切換照舊",
   feed(ctx, RELEASE_CTRL, CTRL, key("Control+period")), 2)
 

@@ -752,7 +752,7 @@ function number_formats(input, segment, env)
 
   -- 數字夾標點（1.、2026/09/15、3-5）：原樣優先，因為多半是日期或區間；
   -- 但它同時也可能是算式，所以把計算結果附在後面。
-  local mixed = body:match("^[%d][%d%.,/%-]*$")
+  local mixed = body:match("^[%d][%d%.,/%-:]*$")
   if mixed and body:find("[^%d]") then
     yield(Candidate("number", segment.start, segment._end, body, "數字"))
     local value = format_number(evaluate(body))
@@ -1267,6 +1267,10 @@ for digit = 0, 9 do CONTROL_DIGITS["Control+" .. digit] = tostring(digit) end
 local CONTROL_PUNCT = {
   ["Control+period"] = ".", ["Control+comma"] = ",",
   ["Control+minus"] = "-", ["Control+slash"] = "/",
+  -- 時間的冒號。分號鍵直接給「:」而不是「;」——數字裡幾乎用不到分號，而冒號要多按
+  -- 一個 Shift 很難按。真的按了 Shift 也認得（各家前端對 Shift 的 repr 寫法不同）。
+  ["Control+semicolon"] = ":", ["Control+colon"] = ":",
+  ["Control+Shift+semicolon"] = ":", ["Control+Shift+colon"] = ":",
 }
 
 local MODIFIER_KEYS = {

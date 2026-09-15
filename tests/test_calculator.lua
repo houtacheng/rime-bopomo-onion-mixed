@@ -88,5 +88,7 @@ H.check("中文數字仍在", candidates("2026"):find("二千零二十六", 1, t
 H.check("日期原樣優先", first("2026/09/15"), "2026/09/15")
 H.check("日期後面才是計算結果", candidates("2026/09/15"):find("15", 1, true) ~= nil, true)
 H.check("1. 仍是原樣", first("1."), "1.")
+H.check("時間原樣輸出", first("13:30"), "13:30")
+H.check("時間不會被當成算式", candidates("13:30"), "13:30")
 
 H.report("計算與換算")
