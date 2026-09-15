@@ -44,15 +44,15 @@ H.check("inch 這種全名也認得", first("10inch"), "0.8333 ft")
 H.check("不認得的單位就不給", candidates("100xyz"), "")
 
 print("\n算式＋單位：整條鏈一起顯示")
-H.check("12*3cm", first("12*3cm"), "12*3=36cm=14.1732 in")
--- 兩種寫法成對出現：帶算式的在前，只有結果的緊接在後
-H.check("同一個目標單位給兩種寫法",
-  candidates("12*3cm"):match("^12%*3=36cm=14%.1732 in\t14%.1732 in\t") ~= nil, true)
-H.check("第一頁六格＝三個目標單位各兩種",
+-- 原單位的結果排最前面（沒經過換算，最確定），接著每個目標單位各給兩種寫法
+H.check("原單位帶算式", first("12*3cm"), "12*3=36cm")
+H.check("原單位只有結果", candidates("12*3cm"):match("^12%*3=36cm\t36cm\t") ~= nil, true)
+H.check("接著才是換算", candidates("12*3cm"):match("\t12%*3=36cm=14%.1732 in\t14%.1732 in") ~= nil, true)
+H.check("第一頁六格＝原單位兩種＋兩個目標各兩種",
   select(2, candidates("12*3cm"):gsub("\t", "")) >= 5, true)
 H.check("沒有單位時結果優先、算式第二", candidates("100+20"):match("^120\t100%+20=120$") ~= nil, true)
-H.check("攝氏算完再換", first("(20+5)c"), "(20+5)=25c=77 ℉")
-H.check("除法也算算式", first("50/2kg"), "50/2=25kg=55.1156 lb")
+H.check("攝氏算完再換", candidates("(20+5)c"):find("(20+5)=25c=77 ℉", 1, true) ~= nil, true)
+H.check("除法也算算式", candidates("50/2kg"):find("50/2=25kg=55.1156 lb", 1, true) ~= nil, true)
 H.check("算不出來就不給", candidates("1+*2cm"), "")
 H.check("沒有單位就只給結果", first("100+20"), "120")
 H.check("沒有算式就不掛鏈", first("100cm"), "39.3701 in")
@@ -73,8 +73,9 @@ else
     return H.collected[1].comment:match("^〔匯率 ") ~= nil
   end)(), true)
   H.check("不認得的貨幣代碼不給", candidates("100zzz"), "")
+  H.check("原單位的金額在最前面", first("100+20usd"), "100+20=120USD")
   H.check("算式＋貨幣的鏈：100+20=120USD=…",
-    first("100+20usd"):match("^100%+20=120USD=[%d,]+%.%d%d TWD$") ~= nil, true)
+    candidates("100+20usd"):match("\t100%+20=120USD=[%d,]+%.%d%d TWD\t") ~= nil, true)
   H.check("加幣在鏈裡", candidates("100+20usd"):find("=120USD=", 1, true) ~= nil, true)
   H.check("加幣也有不帶算式的寫法",
     candidates("100+20usd"):find("\t166.79 CAD\t", 1, true) ~= nil

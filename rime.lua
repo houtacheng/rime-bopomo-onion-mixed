@@ -732,9 +732,15 @@ function number_formats(input, segment, env)
     if shown then
       local conversions, label, display = conversions_for(value, expression_unit)
       if conversions then
-        -- 每個目標單位給兩種寫法：帶算式的與只有結果的，成對排在一起，
-        -- 這樣第一頁就同時看得到兩種形式，不必翻頁去找另一種。
-        local head = expression .. "=" .. shown .. display .. "="
+        -- 先給原單位的結果。它跟目標單位無關，只有一組，而且沒有經過換算，
+        -- 是這串輸入裡最確定的一個數字，所以排在最前面。
+        local source = shown .. display
+        yield(Candidate("number", segment.start, segment._end, expression .. "=" .. source, "〔計算〕"))
+        yield(Candidate("number", segment.start, segment._end, source, "〔計算〕"))
+
+        -- 接著每個目標單位給兩種寫法：帶算式的與只有結果的，成對排在一起，
+        -- 這樣一頁之內就同時看得到兩種形式，不必翻頁去找另一種。
+        local head = expression .. "=" .. source .. "="
         for _, text in ipairs(conversions) do
           yield(Candidate("number", segment.start, segment._end, head .. text, label))
           yield(Candidate("number", segment.start, segment._end, text, label))
