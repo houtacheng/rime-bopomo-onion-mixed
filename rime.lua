@@ -481,18 +481,263 @@ local function suzhou_number(raw)
   return (raw:gsub("%d", function(ch) return suzhou[tonumber(ch)] end))
 end
 
+---------------------------------------------------------------------------
+-- 計算與單位換算：Ctrl + \ 之後打算式（12+5*3）或「數字＋單位」（100cm、98f、5kg）
+---------------------------------------------------------------------------
+
+-- 只認四則運算的小剖析器。不用 load()——那等於把打下去的字當程式碼執行。
+local function evaluate(expression)
+  local text = expression:gsub(",", "")      -- 千分位逗號忽略
+  local pos = 1
+  local parse_expression
+
+  local function parse_atom()
+    local ch = text:sub(pos, pos)
+    if ch == "(" then
+      pos = pos + 1
+      local value = parse_expression()
+      if not value or text:sub(pos, pos) ~= ")" then return nil end
+      pos = pos + 1
+      return value
+    end
+    if ch == "-" then pos = pos + 1; local value = parse_atom(); return value and -value end
+    if ch == "+" then pos = pos + 1; return parse_atom() end
+    local number = text:match("^%d+%.?%d*", pos) or text:match("^%.%d+", pos)
+    if not number then return nil end
+    pos = pos + #number
+    return tonumber(number)
+  end
+
+  local function parse_power()                -- 次方右結合：2^3^2 是 2^(3^2)
+    local base = parse_atom()
+    if not base then return nil end
+    if text:sub(pos, pos) == "^" then
+      pos = pos + 1
+      local exponent = parse_power()
+      if not exponent then return nil end
+      return base ^ exponent
+    end
+    return base
+  end
+
+  local function parse_term()
+    local value = parse_power()
+    if not value then return nil end
+    while true do
+      local op = text:sub(pos, pos)
+      if op ~= "*" and op ~= "/" and op ~= "%" then return value end
+      pos = pos + 1
+      local rhs = parse_power()
+      if not rhs then return nil end
+      if op == "*" then
+        value = value * rhs
+      else
+        if rhs == 0 then return nil end       -- 除以零不給候選，勝過吐出 inf
+        value = (op == "/") and (value / rhs) or (value % rhs)
+      end
+    end
+  end
+
+  parse_expression = function()
+    local value = parse_term()
+    if not value then return nil end
+    while true do
+      local op = text:sub(pos, pos)
+      if op ~= "+" and op ~= "-" then return value end
+      pos = pos + 1
+      local rhs = parse_term()
+      if not rhs then return nil end
+      value = (op == "+") and (value + rhs) or (value - rhs)
+    end
+  end
+
+  local result = parse_expression()
+  if not result or pos <= #text then return nil end   -- 有剩字＝不是合法算式
+  return result
+end
+
+local function format_number(value)
+  if type(value) ~= "number" or value ~= value then return nil end
+  if value == math.huge or value == -math.huge then return nil end
+  local rounded = math.floor(value + 0.5)
+  if math.abs(value - rounded) < 1e-9 and math.abs(value) < 1e15 then
+    return string.format("%d", rounded)
+  end
+  if math.abs(value) < 1e-4 or math.abs(value) >= 1e12 then
+    return (string.format("%.4g", value))
+  end
+  local out = string.format("%.4f", value):gsub("0+$", ""):gsub("%.$", "")
+  return out
+end
+
+-- 單位：factor 是換算到基準單位的倍率，order 是候選的排列順序。
+-- 順序刻意把跨制的單位放前面——會想換算多半就是因為兩制不同。
+local UNIT_FAMILIES = {
+  {
+    order = { "in", "ft", "m", "cm", "mm", "km", "yd", "mi" },
+    factors = { mm = 0.001, cm = 0.01, m = 1, km = 1000,
+                ["in"] = 0.0254, ft = 0.3048, yd = 0.9144, mi = 1609.344 },
+  },
+  {
+    order = { "lb", "oz", "kg", "g", "t", "mg" },
+    factors = { mg = 1e-6, g = 0.001, kg = 1, t = 1000, oz = 0.0283495231, lb = 0.45359237 },
+  },
+  {
+    order = { "l", "ml", "gal", "floz", "cc" },
+    factors = { ml = 0.001, cc = 0.001, l = 1, gal = 3.785411784, floz = 0.0295735296 },
+  },
+  {
+    order = { "ping", "m2", "ft2", "km2", "acre", "ha" },
+    factors = { m2 = 1, km2 = 1e6, ha = 10000, acre = 4046.8564224,
+                ft2 = 0.09290304, ping = 3.305785 },   -- 坪＝六尺見方
+  },
+  {
+    order = { "kmh", "mph", "ms", "knot" },
+    factors = { ms = 1, kmh = 1 / 3.6, mph = 0.44704, knot = 0.514444444 },
+  },
+}
+
+local UNIT_ALIASES = {
+  inch = "in", inches = "in", foot = "ft", feet = "ft", yard = "yd", mile = "mi",
+  meter = "m", metre = "m", pound = "lb", lbs = "lb", ounce = "oz", gram = "g",
+  litre = "l", liter = "l", gallon = "gal", ["m^2"] = "m2", sqm = "m2", sqft = "ft2",
+  celsius = "c", fahrenheit = "f", kelvin = "k", kph = "kmh", knots = "knot",
+}
+
+-- 溫度不是倍率關係，得各自換算
+local function temperature_conversions(value, unit)
+  local celsius
+  if unit == "c" then celsius = value
+  elseif unit == "f" then celsius = (value - 32) * 5 / 9
+  elseif unit == "k" then celsius = value - 273.15
+  else return nil end
+  local out = {}
+  local targets = { c = celsius, f = celsius * 9 / 5 + 32, k = celsius + 273.15 }
+  local labels = { c = "℃", f = "℉", k = "K" }
+  for _, target in ipairs({ "c", "f", "k" }) do
+    if target ~= unit then
+      local text = format_number(targets[target])
+      if text then out[#out + 1] = text .. " " .. labels[target] end
+    end
+  end
+  return out
+end
+
+-- 匯率。輸入法本身不連外：只讀 lua/rates.lua，那個檔案由 generate/rates.py 產生。
+-- 格式是 { date = "2026-09-15", base = "USD", rates = { TWD = 31.5, ... } }。
+-- 檔案不在就沒有貨幣候選，其他換算完全不受影響。
+local RATES = (function()
+  for _, mod in ipairs({ "rates", "lua.rates" }) do
+    local ok, data = pcall(require, mod)
+    if ok and type(data) == "table" and type(data.rates) == "table" then return data end
+  end
+  return nil
+end)()
+
+local CURRENCY_ORDER = { "TWD", "USD", "CAD", "JPY", "EUR", "CNY", "GBP", "HKD", "KRW", "AUD" }
+local NO_DECIMALS = { JPY = true, KRW = true, VND = true }   -- 這幾種本來就不用小數
+
+local function group_digits(text)
+  local sign, integer, rest = text:match("^(%-?)(%d+)(.*)$")
+  if not integer then return text end
+  local grouped = integer:reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+  return sign .. grouped .. rest
+end
+
+-- 錢跟量不一樣：兩位小數就夠，而且要有千分位才讀得出位數
+local function format_money(value, code)
+  if value ~= value or value == math.huge or value == -math.huge then return nil end
+  local text = string.format(NO_DECIMALS[code] and "%.0f" or "%.2f", value)
+  return group_digits(text)
+end
+
+local function currency_conversions(value, code)
+  if not RATES then return nil end
+  code = code:upper()
+  local rate = RATES.rates[code]
+  if not rate or rate == 0 then return nil end
+  local base = value / rate                   -- 先換回基準幣別再換出去
+  local out = {}
+  for _, target in ipairs(CURRENCY_ORDER) do
+    local target_rate = RATES.rates[target]
+    if target_rate and target ~= code then
+      local text = format_money(base * target_rate, target)
+      if text then out[#out + 1] = text .. " " .. target end
+    end
+  end
+  if #out == 0 then return nil end
+  -- 匯率會過期，所以把日期標在候選旁邊，不讓它悄悄給出舊數字
+  return out, "〔匯率 " .. tostring(RATES.date or "?") .. "〕"
+end
+
+local function unit_conversions(value, unit)
+  unit = UNIT_ALIASES[unit] or unit
+  local temperature = temperature_conversions(value, unit)
+  if temperature then return temperature end
+  for _, family in ipairs(UNIT_FAMILIES) do
+    local factor = family.factors[unit]
+    if factor then
+      local base = value * factor
+      local out = {}
+      for _, target in ipairs(family.order) do
+        if target ~= unit then
+          local text = format_number(base / family.factors[target])
+          if text then out[#out + 1] = text .. " " .. target end
+        end
+      end
+      return out
+    end
+  end
+  return nil
+end
+
 function number_formats(input, segment, env)
   if input == "#" then
     yield(Candidate("number", segment.start, segment._end, "數字輸入", "繼續輸入阿拉伯數字"))
     return
   end
-  -- 數字夾標點（1.、2026/09/15、3-5）只給原樣，中文數字那幾種轉換對它沒有意義
-  local mixed = input:match("^#([%d][%d%.,/%-]*)$")
-  if mixed and mixed:find("[^%d]") then
-    yield(Candidate("number", segment.start, segment._end, mixed, "數字"))
+  local body = input:match("^#(.+)$")
+  if not body then return end
+
+  -- 數字＋單位 → 換算（100cm、5kg、98f）
+  local amount, unit = body:match("^([%d%.,]+)(%a[%a%d^]*)$")
+  if amount then
+    local number = tonumber((amount:gsub(",", "")))
+    local conversions = unit_conversions(number, unit:lower())
+    local label = "〔換算〕"
+    if not conversions or #conversions == 0 then
+      conversions, label = currency_conversions(number, unit)
+    end
+    if conversions and #conversions > 0 then
+      for _, text in ipairs(conversions) do
+        yield(Candidate("number", segment.start, segment._end, text, label))
+      end
+      return
+    end
+  end
+
+  -- 數字夾標點（1.、2026/09/15、3-5）：原樣優先，因為多半是日期或區間；
+  -- 但它同時也可能是算式，所以把計算結果附在後面。
+  local mixed = body:match("^[%d][%d%.,/%-]*$")
+  if mixed and body:find("[^%d]") then
+    yield(Candidate("number", segment.start, segment._end, body, "數字"))
+    local value = format_number(evaluate(body))
+    if value and value ~= body then
+      yield(Candidate("number", segment.start, segment._end, value, "〔計算〕"))
+    end
     return
   end
-  local raw = input:match("^#(%d+)$")
+
+  -- 明確的算式（有 + * ^ ( ) %）：計算結果優先
+  if body:find("[%+%*%^%(%)%%]") then
+    local value = format_number(evaluate(body))
+    if value then
+      yield(Candidate("number", segment.start, segment._end, value, "〔計算〕"))
+    end
+    return
+  end
+
+  local raw = body:match("^(%d+)$")
   if not raw then return end
   -- 原始阿拉伯數字放第一位：大千配置把 0-9 全用作注音鍵，這是中文模式下打數字的出口。
   -- 想讓中文數字排回第一位，把這行移到 normal 那兩行之後即可。

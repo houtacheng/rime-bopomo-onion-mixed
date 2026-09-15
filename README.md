@@ -47,6 +47,8 @@ macOS 鼠鬚管（Squirrel）設定，以**洋蔥純注音**為基礎，加上�
 - 按著 `Control` 打上排數字鍵就輸出數字，組字中也可以（macOS 於放開 `Control` 時整串上屏）；
   `.` `,` `-` `/` 可以一起打，`1.`、`2026/09/15`、`1,000` 一氣呵成
 - `Ctrl + \` 進入數字輸入，可取阿拉伯數字、中文數字、金融大寫、蘇州碼、羅馬數字、圈點數字
+- 同一個入口也接受**算式**（`12+5*3`）與**單位換算**（`100cm` → `39.3701 in`、`98f` → `36.6667 ℃`、
+  `10ping`、`5kg`），以及**匯率**（`100usd` → `3,177.54 TWD`）——匯率讀本機檔案並標示日期，輸入法不連外
 
 ---
 
@@ -134,7 +136,7 @@ git clone https://github.com/houtacheng/rime-appearance-editor.git && cd rime-ap
 | `weasel.custom.yaml` | 外觀設定與配色（Windows） |
 | `essay-zh-hant-mc.txt` | 詞頻語料 |
 | `tests/` | 回歸測試，以假的 librime API 載入 `rime.lua`（`tests/run.sh`） |
-| `generate/` | 上面三個生成檔的產生器（詞表、詞頻排名、中英釋義） |
+| `generate/` | 生成檔的產生器（詞表、詞頻排名、中英釋義、匯率表） |
 | `english_gloss.txt` | 中→英釋義表（CC-CEDICT 衍生） |
 
 ---

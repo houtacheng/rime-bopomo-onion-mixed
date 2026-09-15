@@ -25,3 +25,6 @@ cangjie5*
 # 外觀編輯器（獨立專案）寫在這裡的執行期資料
 tools/
 __pycache__/
+
+# 匯率表（由 generate/rates.py 在本機產生，會過期，不進版控）
+lua/rates.lua

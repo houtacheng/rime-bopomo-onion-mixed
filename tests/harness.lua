@@ -10,6 +10,9 @@ M.root = (arg[0]:match("^(.*)/[^/]*$") or ".") .. "/.."
 function M.install(data_dir)
   local dir = data_dir or (M.root .. "/tests")
   rime_api = { get_user_data_dir = function() return dir end }
+  -- rime.lua 用 require 載入 lua/ 底下的資料檔（english_common、rates）。
+  -- 不指定路徑的話，從哪個目錄執行測試就決定找不找得到，結果會隨執行方式而變。
+  package.path = M.root .. "/lua/?.lua;" .. M.root .. "/?.lua;" .. package.path
   Opencc = function() return { convert = function(_, text) return text end } end
   ReverseDb = function() error("測試未提供反查表") end
   Candidate = function(kind, s, e, text, comment)

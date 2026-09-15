@@ -11,6 +11,7 @@
 | `english_mixed.py` | `english_mixed.dict.yaml` | 235,974 |
 | `english_common.py` | `lua/english_common.lua` | 5,000 |
 | `english_gloss.py` | `english_gloss.txt` | 115,618 |
+| `rates.py` | `lua/rates.lua` | 20 種貨幣 |
 
 各自的規則寫在腳本開頭的說明裡，`--help` 也看得到。
 
@@ -34,6 +35,13 @@ generate/english_gloss.py  --cedict cedict.txt.gz
 ```
 
 產生完記得重新部署，並且跑一次 `tests/run.sh`。
+
+匯率表另外算：它會過期，所以**不進版控**，也不附帶重現保證。想更新就重跑，
+輸入法只讀產生出來的檔案、不會自己連外，候選旁邊會標出資料日期。
+
+```bash
+generate/rates.py
+```
 
 ## 重現程度
 
