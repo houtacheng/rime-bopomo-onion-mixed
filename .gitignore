@@ -13,6 +13,8 @@ bopomo_onion_phrase.txt
 lua/personal_phrases.lua
 *.backup
 *.bak
+.backups/
+.onion_manager.json
 
 # Removed input methods
 cangjie5*

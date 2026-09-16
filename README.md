@@ -56,6 +56,12 @@ macOS 鼠鬚管（Squirrel）設定，以**洋蔥純注音**為基礎，加上�
 
 ## 安裝
 
+> 🌟 **推薦：使用視覺化一鍵安裝與更新管理工具**  
+> 免去手動複製與備份步驟，支援一鍵套用最新設定、本地離線匯入、自動保護個人詞庫與歷史秒級還原：  
+> 👉 **[下載 洋蔥注音 Rime 管理器 (Windows .exe / macOS .dmg)](https://github.com/houtacheng/rime-onion-manager/releases/latest)**
+
+### 手動安裝
+
 1. 安裝 macOS 鼠鬚管（Squirrel）。**建議 1.1.2 或更新版本**——舊版 0.18 不支援本設定使用的部分外觀選項。
 
    ```bash
