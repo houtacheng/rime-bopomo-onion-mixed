@@ -17,9 +17,10 @@ patch:
 
 # ── 個別程式 ──────────────────────────────────────────────────────
 # 就地顯示是把文字即時寫進應用程式的輸入區，而部分程式會把它當成真的輸入。
-# Signal 就是一例：還在選字它就開始搜尋，上下鍵改候選也跟著改搜尋字串，
-# 等到按 Return 時它的焦點早已跳到第一個搜尋結果，上屏的字就跑進那個對話框。
+# Signal 就是一例：還在選字它就開始搜尋，上下鍵改候選也跟著改搜尋字串。
 # 只對這類程式關掉就地顯示，其他程式照舊。
+# 注意這只解決「選字時亂搜尋」。Signal 搜尋框有結果時按 Return 上屏會跳去第一個對話，
+# 那是它對 Enter 的處理造成的，輸入法管不到；選字改用 Shift+Q 等選字鍵，見 docs/USAGE.md。
   "app_options/org.whispersystems.signal-desktop":
     no_inline: true
   style/status_message_type: mix # 切換方案時的提示樣式：long | short | mix
